@@ -552,6 +552,24 @@ const totalCount = badges.length;
     align-items: center;
     justify-content: center;
     transition: all 0.2s ease;
+    box-sizing: border-box;
+  }
+
+  .badge-medallion-inner {
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-sizing: border-box;
+  }
+
+  .badge-svg-emblem {
+    width: 100%;
+    height: 100%;
+    display: block;
   }
 
   /* UNLOCKED BADGE: 3D Gold Ring */
@@ -562,19 +580,10 @@ const totalCount = badges.length;
   }
 
   .badge-unlocked .badge-medallion-inner {
-    width: 100%;
-    height: 100%;
-    border-radius: 50%;
-    overflow: hidden;
-    display: flex;
-    align-items: center;
-    justify-content: center;
     box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.25);
   }
 
   .badge-unlocked .badge-svg-emblem {
-    width: 100%;
-    height: 100%;
     filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.15));
   }
 
@@ -586,19 +595,10 @@ const totalCount = badges.length;
   }
 
   .badge-locked .badge-medallion-inner {
-    width: 100%;
-    height: 100%;
-    border-radius: 50%;
     background: #F3F4F6;
-    overflow: hidden;
-    display: flex;
-    align-items: center;
-    justify-content: center;
   }
 
   .badge-locked .badge-svg-emblem {
-    width: 100%;
-    height: 100%;
     filter: grayscale(1) opacity(0.38);
   }
 
@@ -721,10 +721,71 @@ const totalCount = badges.length;
     background: var(--color-surface-hover);
   }
 
-  .modal-badge-icon-wrap {
-    width: 88px;
-    height: 88px;
-    margin-top: 4px;
+  :global(.modal-badge-icon-wrap) {
+    width: 96px;
+    height: 96px;
+    margin-top: 6px;
+    margin-bottom: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  :global(.modal-badge-icon-wrap .badge-medallion-frame) {
+    position: relative !important;
+    width: 92px !important;
+    height: 92px !important;
+    border-radius: 50% !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    box-sizing: border-box !important;
+    transition: all 0.2s ease !important;
+  }
+
+  :global(.modal-badge-icon-wrap.badge-unlocked .badge-medallion-frame) {
+    background: linear-gradient(135deg, #FDE68A 0%, #F59E0B 50%, #D97706 100%) !important;
+    box-shadow: 0 8px 20px rgba(245, 158, 11, 0.35), inset 0 2px 4px rgba(255, 255, 255, 0.8) !important;
+    padding: 4px !important;
+  }
+
+  :global(.modal-badge-icon-wrap.badge-locked .badge-medallion-frame) {
+    background: #E5E7EB !important;
+    box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.1) !important;
+    padding: 4px !important;
+  }
+
+  :global(.modal-badge-icon-wrap .badge-medallion-inner) {
+    width: 100% !important;
+    height: 100% !important;
+    border-radius: 50% !important;
+    overflow: hidden !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    box-sizing: border-box !important;
+  }
+
+  :global(.modal-badge-icon-wrap.badge-unlocked .badge-medallion-inner) {
+    box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.25) !important;
+  }
+
+  :global(.modal-badge-icon-wrap.badge-locked .badge-medallion-inner) {
+    background: #F3F4F6 !important;
+  }
+
+  :global(.modal-badge-icon-wrap .badge-svg-emblem) {
+    width: 100% !important;
+    height: 100% !important;
+    display: block !important;
+  }
+
+  :global(.modal-badge-icon-wrap.badge-unlocked .badge-svg-emblem) {
+    filter: drop-shadow(0 2px 5px rgba(0, 0, 0, 0.2)) !important;
+  }
+
+  :global(.modal-badge-icon-wrap.badge-locked .badge-svg-emblem) {
+    filter: grayscale(1) opacity(0.45) !important;
   }
 
   .modal-badge-body {
@@ -892,10 +953,15 @@ const totalCount = badges.length;
     modalTitle.textContent = title;
     modalDesc.textContent = desc;
 
-    // Clone medallion visual
+    // Set unlocked vs locked status class on modal icon wrapper
+    modalIconTarget.className = `modal-badge-icon-wrap ${isEarned ? 'badge-unlocked' : 'badge-locked'}`;
+
+    // Clone medallion visual with full DOM node preservation
+    modalIconTarget.innerHTML = '';
     const medallion = card.querySelector('.badge-medallion-frame');
     if (medallion) {
-      modalIconTarget.innerHTML = medallion.outerHTML;
+      const clone = medallion.cloneNode(true) as HTMLElement;
+      modalIconTarget.appendChild(clone);
     }
 
     if (isEarned) {
