@@ -1,0 +1,228 @@
+---
+import Layout from '../layouts/Layout.astro';
+import Icons from '../components/Icons.astro';
+import { CONFIG } from '../lib/config';
+---
+
+<Layout
+  title="Terms of Service — StreakGrid"
+  description="Terms of Service, eligibility criteria, and accountability deposit rules for StreakGrid."
+>
+  <div class="legal-page-layout">
+    <header class="legal-header">
+      <div class="legal-header-inner">
+        <a href="/" class="brand-link">
+          <div class="brand-badge">✓</div>
+          <span class="brand-name">StreakGrid</span>
+        </a>
+        <a href="/" class="btn btn-secondary btn-sm">Return Home</a>
+      </div>
+    </header>
+
+    <main class="legal-content-container">
+      <div class="legal-doc-card">
+        <div class="doc-header">
+          <span class="doc-tag">Legal & Compliance</span>
+          <h1 class="doc-title">Terms of Service & Staking Agreement</h1>
+          <span class="doc-date">Effective Date: September 2026</span>
+        </div>
+
+        <div class="doc-body">
+          <section class="doc-section">
+            <h2>1. Platform Purpose & Positioning</h2>
+            <p>
+              StreakGrid is a productivity and personal accountability platform designed to assist individuals in achieving long-term consistency through daily challenge tracking. StreakGrid is <strong>not</strong> an investment vehicle, gambling platform, casino, contest, or prize pool.
+            </p>
+            <p>
+              Users do not generate returns or profits on accountability deposits. The sole economic mechanism for Stake Challenges is:
+              <em>«Put a refundable accountability deposit on the line. Complete the challenge according to its locked rules. Receive your stake back.»</em>
+            </p>
+          </section>
+
+          <section class="doc-section">
+            <h2>2. Eligibility & Age Requirements</h2>
+            <p>
+              To create an account and participate in Free Challenges, you must be at least 13 years old (or the applicable age in your jurisdiction).
+            </p>
+            <p>
+              To create or participate in a <strong>Stake Challenge</strong> involving monetary accountability deposits, you must:
+            </p>
+            <ul>
+              <li>Be at least <strong>{CONFIG.minAgeRequirement} years old</strong> or the age of legal majority in your jurisdiction.</li>
+              <li>Reside in a supported jurisdiction where accountability deposit systems are legally permissible.</li>
+              <li>Use a payment instrument legally issued in your name.</li>
+            </ul>
+          </section>
+
+          <section class="doc-section">
+            <h2>3. Commitment Lock & Non-Modifiability</h2>
+            <p>
+              Once a Stake Challenge is paid and activated:
+            </p>
+            <ul>
+              <li>The challenge cannot be deleted during its active duration.</li>
+              <li>Duration and deadline cannot be shifted backwards.</li>
+              <li>Daily success criteria cannot be softened or modified.</li>
+              <li>Stake amounts cannot be altered or prematurely withdrawn.</li>
+            </ul>
+            <p>
+              This commitment lock exists to preserve the psychological weight and integrity of your self-selected goal.
+            </p>
+          </section>
+
+          <section class="doc-section">
+            <h2>4. Settlement & Refund Process</h2>
+            <p>
+              When a challenge reaches its conclusion:
+            </p>
+            <ul>
+              <li>
+                <strong>Success:</strong> If you satisfy the locked criteria (e.g. required consistency percentage and applicable proof), your accountability deposit is returned in full via the payment method used.
+              </li>
+              <li>
+                <strong>Failure:</strong> If you do not meet the locked criteria before the deadline, your deposit is forfeited according to the published rules and platform agreement.
+              </li>
+            </ul>
+          </section>
+
+          <section class="doc-section">
+            <h2>5. Responsible Use</h2>
+            <p>
+              Stake amounts must reflect meaningful personal accountability, not excessive financial risk. You agree not to deposit funds that would impact your basic living necessities, health, or financial solvency.
+            </p>
+          </section>
+
+          <section class="doc-section">
+            <h2>6. Dispute Resolution</h2>
+            <p>
+              If a technical discrepancy or unfair failure occurs, you may file a formal dispute within {CONFIG.disputeWindowDays} days of challenge completion. Administrative decisions are logged immutably and resolved in accordance with published terms.
+            </p>
+          </section>
+        </div>
+      </div>
+    </main>
+  </div>
+</Layout>
+
+<style>
+  .legal-page-layout {
+    min-height: 100vh;
+    background: var(--color-bg);
+    display: flex;
+    flex-direction: column;
+  }
+
+  .legal-header {
+    background: var(--color-surface);
+    border-bottom: 1px solid var(--color-border);
+    padding: 12px 20px;
+  }
+
+  .legal-header-inner {
+    max-width: 860px;
+    margin: 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .brand-link {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-weight: 700;
+    font-size: 16px;
+    color: var(--color-text);
+  }
+
+  .brand-badge {
+    width: 24px;
+    height: 24px;
+    background: var(--color-primary);
+    border-radius: 5px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #FFFFFF;
+    font-weight: 800;
+    font-size: 14px;
+  }
+
+  .legal-content-container {
+    max-width: 860px;
+    width: 100%;
+    margin: 30px auto 80px auto;
+    padding: 0 20px;
+  }
+
+  .legal-doc-card {
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-modal);
+    padding: 40px 36px;
+    box-shadow: var(--shadow-sm);
+    display: flex;
+    flex-direction: column;
+    gap: 28px;
+  }
+
+  .doc-header {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    border-bottom: 1px solid var(--color-border-subtle);
+    padding-bottom: 20px;
+  }
+
+  .doc-tag {
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--color-primary-hover);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+
+  .doc-title {
+    font-size: 28px;
+    font-weight: 800;
+    color: var(--color-text);
+    letter-spacing: -0.02em;
+  }
+
+  .doc-date {
+    font-size: 13px;
+    color: var(--color-muted);
+  }
+
+  .doc-body {
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+    line-height: 1.6;
+    font-size: 14px;
+    color: var(--color-text);
+  }
+
+  .doc-section {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .doc-section h2 {
+    font-size: 17px;
+    font-weight: 700;
+    color: var(--color-text);
+  }
+
+  .doc-section ul {
+    margin-left: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .doc-section li strong {
+    color: var(--color-text);
+  }
+</style>

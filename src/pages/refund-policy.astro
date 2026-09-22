@@ -1,0 +1,200 @@
+---
+import Layout from '../layouts/Layout.astro';
+import { CONFIG } from '../lib/config';
+---
+
+<Layout
+  title="Refund Policy & Accountability Deposit Return — StreakGrid"
+  description="Transparent refund and settlement policy for Stake Challenges on StreakGrid."
+>
+  <div class="legal-page-layout">
+    <header class="legal-header">
+      <div class="legal-header-inner">
+        <a href="/" class="brand-link">
+          <div class="brand-badge">✓</div>
+          <span class="brand-name">StreakGrid</span>
+        </a>
+        <a href="/" class="btn btn-secondary btn-sm">Return Home</a>
+      </div>
+    </header>
+
+    <main class="legal-content-container">
+      <div class="legal-doc-card">
+        <div class="doc-header">
+          <span class="doc-tag">Transparency & Compliance</span>
+          <h1 class="doc-title">Refund & Settlement Policy</h1>
+          <span class="doc-date">Effective Date: September 2026</span>
+        </div>
+
+        <div class="doc-body">
+          <section class="doc-section">
+            <h2>1. Nature of Accountability Deposits</h2>
+            <p>
+              When participating in a Stake Challenge, your deposit is held in a dedicated, simulated escrow reserve. It is not operating capital for StreakGrid and is not subjected to pooled wagering or contest distribution.
+            </p>
+          </section>
+
+          <section class="doc-section">
+            <h2>2. Full Refund Conditions (Success)</h2>
+            <p>
+              Your accountability deposit is returned in full when you fulfill the locked rules agreed upon at creation:
+            </p>
+            <ul>
+              <li>Reaching the required number of successful days according to your selected success rule.</li>
+              <li>Maintaining tracking consistency across the challenge duration.</li>
+              <li>Submitting project or completion proof if your challenge required verified public outputs.</li>
+            </ul>
+            <p>
+              Once completed and verified, your refund is initiated immediately and returned to the original payment method without deduction of platform fees (100% principal return).
+            </p>
+          </section>
+
+          <section class="doc-section">
+            <h2>3. Forfeiture Conditions (Failure)</h2>
+            <p>
+              If a challenge deadline arrives and the locked consistency criteria have not been satisfied:
+            </p>
+            <ul>
+              <li>The challenge concludes with status: <em>«Challenge ended before the required consistency target was reached.»</em></li>
+              <li>The deposit is forfeited in accordance with the locked challenge agreement.</li>
+              <li>StreakGrid never uses shame-based messaging or public humiliation. The outcome is treated calmly as an objective record of consistency.</li>
+            </ul>
+          </section>
+
+          <section class="doc-section">
+            <h2>4. Voluntary Cancellation Before Activation</h2>
+            <p>
+              You may cancel a challenge and abandon payment checkout at any time prior to verified payment. Once a payment is confirmed by the payment gateway and the commitment lock is engaged, premature cancellation is unavailable to protect the commitment integrity.
+            </p>
+          </section>
+
+          <section class="doc-section">
+            <h2>5. Dispute Window & Review Guarantee</h2>
+            <p>
+              If an error or technical malfunction falsely marks a day as missed, you have <strong>{CONFIG.disputeWindowDays} calendar days</strong> from challenge completion to file a dispute via the challenge interface. Our administrative review evaluates server logs and external evidence to issue a full refund when warranted.
+            </p>
+          </section>
+        </div>
+      </div>
+    </main>
+  </div>
+</Layout>
+
+<style>
+  .legal-page-layout {
+    min-height: 100vh;
+    background: var(--color-bg);
+    display: flex;
+    flex-direction: column;
+  }
+
+  .legal-header {
+    background: var(--color-surface);
+    border-bottom: 1px solid var(--color-border);
+    padding: 12px 20px;
+  }
+
+  .legal-header-inner {
+    max-width: 860px;
+    margin: 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .brand-link {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-weight: 700;
+    font-size: 16px;
+    color: var(--color-text);
+  }
+
+  .brand-badge {
+    width: 24px;
+    height: 24px;
+    background: var(--color-primary);
+    border-radius: 5px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #FFFFFF;
+    font-weight: 800;
+    font-size: 14px;
+  }
+
+  .legal-content-container {
+    max-width: 860px;
+    width: 100%;
+    margin: 30px auto 80px auto;
+    padding: 0 20px;
+  }
+
+  .legal-doc-card {
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-modal);
+    padding: 40px 36px;
+    box-shadow: var(--shadow-sm);
+    display: flex;
+    flex-direction: column;
+    gap: 28px;
+  }
+
+  .doc-header {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    border-bottom: 1px solid var(--color-border-subtle);
+    padding-bottom: 20px;
+  }
+
+  .doc-tag {
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--color-primary-hover);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+
+  .doc-title {
+    font-size: 28px;
+    font-weight: 800;
+    color: var(--color-text);
+    letter-spacing: -0.02em;
+  }
+
+  .doc-date {
+    font-size: 13px;
+    color: var(--color-muted);
+  }
+
+  .doc-body {
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+    line-height: 1.6;
+    font-size: 14px;
+    color: var(--color-text);
+  }
+
+  .doc-section {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .doc-section h2 {
+    font-size: 17px;
+    font-weight: 700;
+    color: var(--color-text);
+  }
+
+  .doc-section ul {
+    margin-left: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+</style>

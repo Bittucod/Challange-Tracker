@@ -1,0 +1,336 @@
+---
+import AppLayout from '../../layouts/AppLayout.astro';
+import Icons from '../../components/Icons.astro';
+import StakeBadge from '../../components/StakeBadge.astro';
+import { getUserFromCookies } from '../../lib/auth';
+import { db } from '../../lib/db';
+import { calculateChallengeAnalytics } from '../../lib/engine';
+import { getChallengeStakeCommitment, getRemainingDays } from '../../lib/stakes';
+import { formatCurrencyAmount } from '../../lib/config';
+import type { Challenge, Activity, DailyRecord } from '../../lib/types';
+
+const user = getUserFromCookies(Astro.cookies);
+if (!user) {
+  return Astro.redirect('/login');
+}
+
+// Fetch user's stake challenges
+const stakeChallenges = db
+  .prepare(`
+    SELECT c.* FROM challenges c
+    WHERE c.user_id = ? AND c.challenge_type = 'stake' AND c.is_archived = 0
+    ORDER BY c.created_at DESC
+  `)
+  .all(user.id) as Challenge[];
+
+const commitmentsData = stakeChallenges.map((c) => {
+  const activities = db
+    .prepare('SELECT * FROM activities WHERE challenge_id = ? ORDER BY sort_order ASC')
+    .all(c.id) as Activity[];
+  const records = db
+    .prepare('SELECT * FROM daily_records WHERE challenge_id = ?')
+    .all(c.id) as DailyRecord[];
+
+  const analytics = calculateChallengeAnalytics(c, activities, records);
+  const commitment = getChallengeStakeCommitment(c.id);
+  const remainingDays = getRemainingDays(c.end_date);
+
+  return {
+    challenge: c,
+    analytics,
+    commitment,
+    remainingDays
+  };
+});
+---
+
+<AppLayout title="My Commitments — StreakGrid">
+  <div class="commitments-view-container">
+    <div class="commitments-header">
+      <div>
+        <h1 class="commitments-title">My Commitments</h1>
+        <p class="commitments-sub">
+          Challenges backed by real accountability stakes. Finish your challenge to receive your stake return.
+        </p>
+      </div>
+
+      <a href="/app/challenges/new" class="btn btn-primary btn-sm">
+        <Icons name="plus" size={14} />
+        <span>New Stake Challenge</span>
+      </a>
+    </div>
+
+    {commitmentsData.length === 0 ? (
+      <div class="empty-commitments-card">
+        <div class="empty-badge-circle">
+          <span>🔥</span>
+        </div>
+        <h3 class="empty-title">No Active Commitments</h3>
+        <p class="empty-desc">
+          «Put something meaningful on the line. Show up. Complete your challenge. Get your stake back.»
+        </p>
+        <div class="empty-actions">
+          <a href="/app/challenges/new" class="btn btn-primary">
+            <span>Start a Stake Challenge</span>
+            <Icons name="arrow-right" size={15} />
+          </a>
+        </div>
+      </div>
+    ) : (
+      <div class="commitments-table-card">
+        <div class="table-responsive">
+          <table class="commitments-table">
+            <thead>
+              <tr>
+                <th>Challenge</th>
+                <th>Progress</th>
+                <th>Streak</th>
+                <th>Stake</th>
+                <th>Deadline</th>
+                <th>Status</th>
+                <th class="col-action">Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              {commitmentsData.map(({ challenge, analytics, commitment, remainingDays }) => {
+                const stakeDisplay = commitment
+                  ? formatCurrencyAmount(commitment.amount, commitment.currency)
+                  : '—';
+
+                return (
+                  <tr class="commitment-row">
+                    <td class="col-main">
+                      <a href={`/app/challenges/${challenge.id}`} class="challenge-link">
+                        <strong class="challenge-name">{challenge.name}</strong>
+                      </a>
+                      <span class="challenge-dates">
+                        {challenge.start_date} → {challenge.end_date}
+                      </span>
+                    </td>
+
+                    <td class="col-progress">
+                      <div class="progress-cell">
+                        <span class="prog-text">
+                          {analytics.currentDayNumber} / {challenge.duration} days
+                        </span>
+                        <div class="mini-bar">
+                          <div
+                            class="mini-bar-fill"
+                            style={`width: ${Math.min(100, Math.round((analytics.currentDayNumber / challenge.duration) * 100))}%`}
+                          ></div>
+                        </div>
+                      </div>
+                    </td>
+
+                    <td class="col-streak">
+                      <span class="badge badge-streak">
+                        🔥 {analytics.currentStreak}
+                      </span>
+                    </td>
+
+                    <td class="col-stake">
+                      <strong class="stake-amount-text">{stakeDisplay}</strong>
+                    </td>
+
+                    <td class="col-deadline">
+                      {remainingDays > 0 ? (
+                        <span class="deadline-text">{remainingDays} days left</span>
+                      ) : (
+                        <span class="deadline-ended">Ended</span>
+                      )}
+                    </td>
+
+                    <td class="col-status">
+                      <StakeBadge commitment={commitment} challengeType={challenge.challenge_type} />
+                    </td>
+
+                    <td class="col-action">
+                      <a href={`/app/challenges/${challenge.id}`} class="btn btn-secondary btn-sm">
+                        Open Tracker
+                      </a>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    )}
+  </div>
+</AppLayout>
+
+<style>
+  .commitments-view-container {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+  }
+
+  .commitments-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 16px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--color-border);
+  }
+
+  .commitments-title {
+    font-size: 24px;
+    font-weight: 700;
+    color: var(--color-text);
+  }
+
+  .commitments-sub {
+    font-size: 13px;
+    color: var(--color-muted);
+  }
+
+  /* Table Card */
+  .commitments-table-card {
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-panel);
+    box-shadow: var(--shadow-sm);
+    overflow: hidden;
+  }
+
+  .table-responsive {
+    width: 100%;
+    overflow-x: auto;
+  }
+
+  .commitments-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+  }
+
+  .commitments-table th {
+    background: #FAF9F5;
+    padding: 10px 14px;
+    text-align: left;
+    font-weight: 600;
+    font-size: 12px;
+    color: var(--color-text-secondary);
+    border-bottom: 1px solid var(--color-border);
+    white-space: nowrap;
+  }
+
+  .commitments-table td {
+    padding: 14px;
+    border-bottom: 1px solid var(--color-border-subtle);
+    vertical-align: middle;
+  }
+
+  .commitment-row:hover td {
+    background: #FCFCF9;
+  }
+
+  .challenge-name {
+    font-size: 14px;
+    color: var(--color-text);
+    display: block;
+  }
+
+  .challenge-link:hover .challenge-name {
+    color: var(--color-primary-hover);
+  }
+
+  .challenge-dates {
+    font-size: 11px;
+    color: var(--color-muted);
+  }
+
+  .progress-cell {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 110px;
+  }
+
+  .prog-text {
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--color-text);
+  }
+
+  .mini-bar {
+    width: 100%;
+    height: 6px;
+    background: var(--color-border-subtle);
+    border-radius: 3px;
+    overflow: hidden;
+  }
+
+  .mini-bar-fill {
+    height: 100%;
+    background: var(--color-primary);
+    border-radius: 3px;
+  }
+
+  .stake-amount-text {
+    font-size: 14px;
+    color: var(--color-text);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .deadline-text {
+    font-size: 12px;
+    color: var(--color-text-secondary);
+  }
+
+  .deadline-ended {
+    font-size: 12px;
+    color: var(--color-muted);
+  }
+
+  .col-action {
+    text-align: right;
+  }
+
+  /* Empty state */
+  .empty-commitments-card {
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-modal);
+    box-shadow: var(--shadow-sm);
+    padding: 60px 24px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    gap: 16px;
+  }
+
+  .empty-badge-circle {
+    width: 56px;
+    height: 56px;
+    border-radius: 50%;
+    background: var(--color-streak-soft);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 24px;
+  }
+
+  .empty-title {
+    font-size: 20px;
+    font-weight: 700;
+    color: var(--color-text);
+  }
+
+  .empty-desc {
+    font-size: 14px;
+    color: var(--color-text-secondary);
+    max-width: 440px;
+    line-height: 1.5;
+    font-style: italic;
+  }
+
+  .empty-actions {
+    margin-top: 8px;
+  }
+</style>

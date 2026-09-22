@@ -1,0 +1,1320 @@
+---
+import Icons from './Icons.astro';
+import type { Challenge, Activity, DayEvaluation } from '../lib/types';
+
+interface Props {
+  challenge: Challenge;
+  activities: Activity[];
+  days: DayEvaluation[];
+}
+
+const { challenge, activities, days } = Astro.props;
+const activeActivities = activities.filter((a) => a.is_active);
+---
+
+<div class="tracker-wrapper" data-challenge-id={challenge.id} data-rule={challenge.success_rule} data-min-count={challenge.success_min_count}>
+  <!-- Sticky Toolbar -->
+  <div class="tracker-toolbar">
+    <div class="toolbar-left">
+      <button id="btn-jump-today" class="btn btn-secondary btn-sm" title="Jump to Today's row">
+        <Icons name="target" size={14} />
+        <span>Today</span>
+      </button>
+
+      <div class="view-filter-pills">
+        <button class="filter-pill active" data-filter="all">All Days ({challenge.duration})</button>
+        <button class="filter-pill" data-filter="current">Active / Recent</button>
+        <button class="filter-pill" data-filter="incomplete">Pending Only</button>
+      </div>
+
+      <!-- Contextual Action for Selected Cell -->
+      <div id="selected-cell-control" class="selected-cell-control" style="display: none;">
+        <span id="selected-cell-title" class="selected-cell-title">Day 1</span>
+        <button type="button" id="btn-cell-note-action" class="btn-cell-note-action" title="Add note" aria-label="Add note">
+          <span id="cell-note-action-icon" class="cell-note-action-icon">•</span>
+          <span id="cell-note-action-text">Add Note</span>
+        </button>
+        <button type="button" id="btn-deselect-cell" class="btn-deselect-cell" title="Deselect cell" aria-label="Deselect cell">✕</button>
+      </div>
+    </div>
+
+    <div class="toolbar-right">
+      <div id="sync-status" class="sync-indicator" title="All changes saved to cloud">
+        <span class="sync-dot"></span>
+        <span class="sync-text">Saved</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Spreadsheet Table Container -->
+  <div class="tracker-container" id="tracker-scroll-box">
+    <table class="tracker-table" id="tracker-main-table">
+      <thead>
+        <tr>
+          <th class="col-date">Date</th>
+          {activeActivities.map((act) => (
+            <th class="col-activity" data-activity-id={act.id}>
+              <div class="activity-header-content">
+                <span class="activity-icon-wrap">
+                  <Icons name={act.icon} size={15} />
+                </span>
+                <span class="activity-name">{act.name}</span>
+              </div>
+            </th>
+          ))}
+          <th class="col-status-summary">Day Status</th>
+        </tr>
+      </thead>
+      <tbody>
+        {days.map((day) => {
+          const rowClass = [
+            'tracker-row',
+            day.isToday ? 'tracker-row-today' : '',
+            day.isPast ? 'tracker-row-past' : '',
+            day.isFuture ? 'tracker-row-future' : ''
+          ].filter(Boolean).join(' ');
+
+          return (
+            <tr class={rowClass} id={day.isToday ? 'today-row' : `row-${day.date}`} data-date={day.date} data-day-num={day.dayNumber}>
+              <td class="col-date">
+                <div class="date-cell-inner">
+                  <span class="day-num">D{day.dayNumber}</span>
+                  <span class="date-short">{day.shortDate}</span>
+                  <span class="day-dow">{day.dayOfWeek}</span>
+                  {day.isToday && <span class="today-tag">TODAY</span>}
+                </div>
+              </td>
+
+              {activeActivities.map((act) => {
+                const rec = day.records[act.id];
+                const status = rec ? rec.status : 'pending';
+                const hasNote = Boolean(rec && rec.note && rec.note.trim());
+                const noteContent = rec ? rec.note || '' : '';
+
+                return (
+                  <td class="cell-wrapper" data-activity-id={act.id}>
+                    <div
+                      class={`grid-cell status-${status} ${hasNote ? 'has-note' : ''}`}
+                      data-date={day.date}
+                      data-day-num={day.dayNumber}
+                      data-short-date={day.shortDate}
+                      data-activity-id={act.id}
+                      data-activity-name={act.name}
+                      data-status={status}
+                      data-note={noteContent}
+                      title={`${act.name} on ${day.shortDate}: ${status.toUpperCase()}${hasNote ? ' (Has Note)' : ''}`}
+                      tabindex="0"
+                      role="button"
+                      aria-label={`${act.name} on ${day.shortDate}${hasNote ? ' - This day has a note' : ''}`}
+                    >
+                      <span class="cell-symbol">
+                        {status === 'completed' && '✓'}
+                        {status === 'pending' && '○'}
+                        {status === 'missed' && '✕'}
+                        {status === 'na' && '—'}
+                      </span>
+                    </div>
+                  </td>
+                );
+              })}
+
+              <td class="col-status-summary">
+                <span class={`day-indicator ${day.isSuccessful ? 'indicator-success' : day.isMissed ? 'indicator-missed' : 'indicator-pending'}`}>
+                  {day.isSuccessful ? (day.isPerfect ? '★ Perfect' : '✓ Done') : day.isMissed ? '✕ Missed' : `${day.completedCount}/${day.applicableCount}`}
+                </span>
+              </td>
+            </tr>
+          );
+        })}
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Minimal Lightweight Daily Note Modal / Popover -->
+  <div id="note-modal-overlay" class="note-modal-overlay" style="display: none;">
+    <!-- Note Viewer Mode -->
+    <div id="note-view-card" class="note-modal-card" style="display: none;">
+      <div class="note-card-header">
+        <div class="note-card-title-wrap">
+          <span id="note-view-day-title" class="note-card-day-title">Day 23</span>
+          <span id="note-view-sub-title" class="note-card-sub-title">Pushups</span>
+        </div>
+        <button type="button" id="btn-close-note-view" class="note-close-btn" aria-label="Close note">✕</button>
+      </div>
+      <div class="note-card-body">
+        <p id="note-view-text" class="note-view-text"></p>
+      </div>
+      <div id="note-view-actions" class="note-card-actions">
+        <button type="button" id="btn-edit-note" class="btn-note-secondary">Edit</button>
+        <button type="button" id="btn-prompt-delete-note" class="btn-note-danger">Delete</button>
+      </div>
+      <div id="note-delete-confirm-row" class="note-delete-confirm-row" style="display: none;">
+        <span class="delete-confirm-prompt">Delete this note?</span>
+        <div class="delete-confirm-btns">
+          <button type="button" id="btn-cancel-delete" class="btn-note-secondary btn-sm">Cancel</button>
+          <button type="button" id="btn-confirm-delete" class="btn-note-danger-solid btn-sm">Delete</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Note Editor Mode -->
+    <div id="note-editor-card" class="note-modal-card" style="display: none;">
+      <div class="note-card-header">
+        <div class="note-card-title-wrap">
+          <span id="note-editor-day-title" class="note-card-day-title">Day 23</span>
+          <span id="note-editor-sub-title" class="note-card-sub-title">Pushups</span>
+        </div>
+        <button type="button" id="btn-close-note-editor" class="note-close-btn" aria-label="Close editor">✕</button>
+      </div>
+      <div class="note-card-body">
+        <textarea
+          id="note-editor-input"
+          class="note-textarea"
+          placeholder="Write a note for this day…"
+          maxlength="500"
+          rows="3"
+        ></textarea>
+        <div class="note-editor-meta">
+          <span id="note-char-counter" class="note-char-counter">0/500</span>
+        </div>
+      </div>
+      <div class="note-card-actions">
+        <button type="button" id="btn-editor-delete-note" class="btn-note-danger" style="display: none;">Delete</button>
+        <div class="note-editor-right-btns">
+          <button type="button" id="btn-cancel-note-editor" class="btn-note-secondary">Cancel</button>
+          <button type="button" id="btn-save-note" class="btn-note-primary">Save</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Cell Context Menu Popover for Right-Click Status Selection -->
+  <div id="cell-menu-popover" class="cell-popover" style="display: none;">
+    <div class="popover-header">
+      <span id="popover-title" class="popover-cell-title">Sep 20 • Pushups</span>
+      <button id="popover-close-btn" class="popover-close" aria-label="Close">
+        <Icons name="close" size={13} />
+      </button>
+    </div>
+    <div class="popover-actions">
+      <button class="popover-opt" data-set-status="completed">
+        <span class="opt-symbol success">✓</span> Completed
+      </button>
+      <button class="popover-opt" data-set-status="pending">
+        <span class="opt-symbol neutral">○</span> Pending
+      </button>
+      <button class="popover-opt" data-set-status="missed">
+        <span class="opt-symbol danger">✕</span> Missed
+      </button>
+      <button class="popover-opt" data-set-status="na">
+        <span class="opt-symbol muted">—</span> Not Applicable
+      </button>
+    </div>
+  </div>
+</div>
+
+<style>
+  .tracker-wrapper {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .tracker-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 10px;
+    padding: 4px 2px;
+  }
+
+  .toolbar-left {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+
+  .view-filter-pills {
+    display: inline-flex;
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    padding: 2px;
+    gap: 2px;
+  }
+
+  .filter-pill {
+    padding: 4px 10px;
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--color-text-secondary);
+    border-radius: 4px;
+    transition: all 0.1s ease;
+  }
+
+  .filter-pill:hover {
+    color: var(--color-text);
+  }
+
+  .filter-pill.active {
+    background: #EFEFEA;
+    color: var(--color-text);
+    font-weight: 600;
+  }
+
+  /* Contextual Selected Cell Control */
+  .selected-cell-control {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    padding: 3px 8px;
+    font-size: 12px;
+    animation: cellPillFade 0.15s ease;
+  }
+
+  @keyframes cellPillFade {
+    from { opacity: 0; transform: translateY(-2px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .selected-cell-title {
+    font-weight: 600;
+    color: var(--color-text);
+  }
+
+  .btn-cell-note-action {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--color-primary);
+    background: var(--color-primary-light);
+    border: 1px solid transparent;
+    padding: 2px 8px;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.12s ease;
+  }
+
+  .btn-cell-note-action:hover {
+    background: #DCFCE7;
+    color: var(--color-primary-hover);
+  }
+
+  .cell-note-action-icon {
+    font-size: 10px;
+    line-height: 1;
+  }
+
+  .btn-deselect-cell {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: transparent;
+    border: none;
+    color: var(--color-muted);
+    font-size: 11px;
+    padding: 2px 4px;
+    cursor: pointer;
+    border-radius: 3px;
+  }
+
+  .btn-deselect-cell:hover {
+    color: var(--color-text);
+    background: var(--color-surface-hover);
+  }
+
+  /* Cell Selected Outline (Zero Layout Shift) */
+  :global(.grid-cell.cell-selected) {
+    outline: 2px solid var(--color-primary) !important;
+    outline-offset: 1px !important;
+  }
+
+  .sync-indicator {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    color: var(--color-muted);
+  }
+
+  .sync-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--color-primary);
+    transition: background 0.2s ease;
+  }
+
+  .sync-indicator.syncing .sync-dot {
+    background: var(--color-streak);
+    animation: syncPulse 1s infinite alternate;
+  }
+
+  .sync-indicator.offline .sync-dot {
+    background: #9CA3AF;
+  }
+
+  @keyframes syncPulse {
+    from { opacity: 0.4; }
+    to { opacity: 1; }
+  }
+
+  /* Activity Header styling */
+  .activity-header-content {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--color-text);
+    white-space: nowrap;
+    min-width: 60px;
+  }
+
+  .activity-icon-wrap {
+    color: var(--color-text-secondary);
+    display: inline-flex;
+  }
+
+  /* Date column formatting */
+  .date-cell-inner {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .day-num {
+    font-weight: 700;
+    color: var(--color-text);
+    min-width: 28px;
+  }
+
+  .date-short {
+    color: var(--color-text-secondary);
+  }
+
+  .day-dow {
+    font-size: 11px;
+    color: var(--color-muted);
+  }
+
+  .today-tag {
+    font-size: 9px;
+    font-weight: 700;
+    padding: 1px 4px;
+    border-radius: 3px;
+    background: var(--color-primary);
+    color: #FFFFFF;
+    letter-spacing: 0.04em;
+  }
+
+  /* Status Summary */
+  .col-status-summary {
+    width: 80px;
+    font-size: 11px;
+    white-space: nowrap;
+    text-align: right;
+    padding-right: 14px !important;
+  }
+
+  .day-indicator {
+    font-size: 11px;
+    font-weight: 600;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .indicator-success {
+    color: var(--color-primary-hover);
+    background: var(--color-primary-light);
+  }
+
+  .indicator-missed {
+    color: var(--color-missed);
+    background: var(--color-missed-soft);
+  }
+
+  .indicator-pending {
+    color: var(--color-muted);
+  }
+
+  /* Minimal Note Modal / Popover Overlay */
+  .note-modal-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 1200;
+    background: rgba(15, 23, 42, 0.35);
+    backdrop-filter: blur(1px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+  }
+
+  .note-modal-card {
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-panel);
+    box-shadow: var(--shadow-lg);
+    width: 100%;
+    max-width: 320px;
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    animation: noteCardPop 0.15s ease-out;
+  }
+
+  @keyframes noteCardPop {
+    from { opacity: 0; transform: scale(0.96); }
+    to { opacity: 1; transform: scale(1); }
+  }
+
+  .note-card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-bottom: 1px solid var(--color-border-subtle);
+    padding-bottom: 8px;
+  }
+
+  .note-card-title-wrap {
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
+  }
+
+  .note-card-day-title {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--color-text);
+  }
+
+  .note-card-sub-title {
+    font-size: 12px;
+    color: var(--color-text-secondary);
+  }
+
+  .note-close-btn {
+    background: transparent;
+    border: none;
+    color: var(--color-muted);
+    font-size: 12px;
+    padding: 2px 4px;
+    cursor: pointer;
+    border-radius: 3px;
+  }
+
+  .note-close-btn:hover {
+    color: var(--color-text);
+  }
+
+  .note-card-body {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .note-view-text {
+    font-size: 13px;
+    line-height: 1.5;
+    color: var(--color-text);
+    white-space: pre-wrap;
+    word-break: break-word;
+    margin: 0;
+    min-height: 48px;
+    max-height: 180px;
+    overflow-y: auto;
+  }
+
+  .note-textarea {
+    width: 100%;
+    font-family: inherit;
+    font-size: 13px;
+    line-height: 1.5;
+    padding: 8px 10px;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--color-border);
+    background: var(--color-surface-subtle);
+    color: var(--color-text);
+    resize: none;
+    outline: none;
+    transition: border-color 0.12s;
+    height: 80px;
+    box-sizing: border-box;
+  }
+
+  .note-textarea:focus {
+    border-color: var(--color-primary);
+    background: var(--color-surface);
+  }
+
+  .note-editor-meta {
+    display: flex;
+    justify-content: flex-end;
+  }
+
+  .note-char-counter {
+    font-size: 11px;
+    color: var(--color-muted);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .note-char-counter.limit-exceeded {
+    color: var(--color-missed);
+    font-weight: 600;
+  }
+
+  .note-card-actions {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding-top: 4px;
+  }
+
+  .note-editor-right-btns {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-left: auto;
+  }
+
+  .btn-note-primary {
+    background: var(--color-primary);
+    color: #FFFFFF;
+    border: 1px solid var(--color-primary);
+    border-radius: 4px;
+    padding: 4px 12px;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.12s;
+  }
+
+  .btn-note-primary:hover {
+    background: var(--color-primary-hover);
+  }
+
+  .btn-note-secondary {
+    background: var(--color-surface-subtle);
+    color: var(--color-text);
+    border: 1px solid var(--color-border);
+    border-radius: 4px;
+    padding: 4px 10px;
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.12s;
+  }
+
+  .btn-note-secondary:hover {
+    background: #EFEFEA;
+    color: var(--color-text);
+  }
+
+  .btn-note-danger {
+    background: transparent;
+    color: var(--color-missed);
+    border: 1px solid transparent;
+    border-radius: 4px;
+    padding: 4px 8px;
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+  }
+
+  .btn-note-danger:hover {
+    background: var(--color-missed-soft);
+  }
+
+  .btn-note-danger-solid {
+    background: var(--color-missed);
+    color: #FFFFFF;
+    border: 1px solid var(--color-missed);
+    border-radius: 4px;
+    padding: 4px 10px;
+    font-size: 11px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+
+  .btn-note-danger-solid:hover {
+    background: #DC2626;
+  }
+
+  .note-delete-confirm-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    background: var(--color-missed-soft);
+    padding: 6px 10px;
+    border-radius: var(--radius-sm);
+  }
+
+  .delete-confirm-prompt {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--color-missed);
+  }
+
+  .delete-confirm-btns {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  /* Right-Click Status Popover */
+  .cell-popover {
+    position: fixed;
+    z-index: 1000;
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-panel);
+    box-shadow: var(--shadow-lg);
+    width: 220px;
+    padding: 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .popover-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .popover-cell-title {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--color-text);
+  }
+
+  .popover-close {
+    background: transparent;
+    border: none;
+    color: var(--color-muted);
+    padding: 2px;
+    cursor: pointer;
+  }
+
+  .popover-actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 4px;
+  }
+
+  .popover-opt {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 8px;
+    border-radius: 6px;
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--color-text);
+    background: var(--color-surface-subtle);
+    border: 1px solid var(--color-border-subtle);
+    transition: all 0.1s ease;
+    cursor: pointer;
+  }
+
+  .popover-opt:hover {
+    background: #EFEFEA;
+  }
+
+  .opt-symbol {
+    font-size: 13px;
+    font-weight: 700;
+  }
+
+  .opt-symbol.success { color: var(--color-primary); }
+  .opt-symbol.neutral { color: var(--color-text-secondary); }
+  .opt-symbol.danger { color: var(--color-missed); }
+  .opt-symbol.muted { color: var(--color-muted); }
+</style>
+
+<script>
+  import { queueOfflineRecord } from '../scripts/offline-sync';
+  import { triggerConfetti } from '../scripts/confetti';
+
+  const wrapper = document.querySelector('.tracker-wrapper') as HTMLElement;
+  if (wrapper) {
+    const challengeId = wrapper.dataset.challengeId!;
+    const successRule = wrapper.dataset.rule || 'all';
+    const successMin = parseInt(wrapper.dataset.minCount || '1', 10);
+
+    const scrollBox = document.getElementById('tracker-scroll-box');
+    const todayRow = document.getElementById('today-row');
+    const jumpTodayBtn = document.getElementById('btn-jump-today');
+    const syncStatus = document.getElementById('sync-status');
+    const syncText = syncStatus?.querySelector('.sync-text');
+
+    // Contextual Toolbar Selected Cell Controls
+    const selectedCellControl = document.getElementById('selected-cell-control');
+    const selectedCellTitle = document.getElementById('selected-cell-title');
+    const cellNoteActionBtn = document.getElementById('btn-cell-note-action');
+    const cellNoteActionText = document.getElementById('cell-note-action-text');
+    const btnDeselectCell = document.getElementById('btn-deselect-cell');
+
+    // Note Modal Elements
+    const noteModalOverlay = document.getElementById('note-modal-overlay') as HTMLElement;
+    // Viewer Card
+    const noteViewCard = document.getElementById('note-view-card') as HTMLElement;
+    const noteViewDayTitle = document.getElementById('note-view-day-title');
+    const noteViewSubTitle = document.getElementById('note-view-sub-title');
+    const noteViewText = document.getElementById('note-view-text');
+    const noteViewActions = document.getElementById('note-view-actions') as HTMLElement;
+    const btnEditNote = document.getElementById('btn-edit-note');
+    const btnPromptDeleteNote = document.getElementById('btn-prompt-delete-note');
+    const noteDeleteConfirmRow = document.getElementById('note-delete-confirm-row') as HTMLElement;
+    const btnCancelDelete = document.getElementById('btn-cancel-delete');
+    const btnConfirmDelete = document.getElementById('btn-confirm-delete');
+    const btnCloseNoteView = document.getElementById('btn-close-note-view');
+    // Editor Card
+    const noteEditorCard = document.getElementById('note-editor-card') as HTMLElement;
+    const noteEditorDayTitle = document.getElementById('note-editor-day-title');
+    const noteEditorSubTitle = document.getElementById('note-editor-sub-title');
+    const noteEditorInput = document.getElementById('note-editor-input') as HTMLTextAreaElement;
+    const noteCharCounter = document.getElementById('note-char-counter');
+    const editorDeleteBtn = document.getElementById('btn-editor-delete-note');
+    const btnCancelNoteEditor = document.getElementById('btn-cancel-note-editor');
+    const btnSaveNote = document.getElementById('btn-save-note') as HTMLButtonElement;
+    const btnCloseNoteEditor = document.getElementById('btn-close-note-editor');
+
+    // Right-Click Status Popover Elements
+    const popover = document.getElementById('cell-menu-popover') as HTMLElement;
+    const popoverTitle = document.getElementById('popover-title');
+    const popoverClose = document.getElementById('popover-close-btn');
+
+    let selectedCell: HTMLElement | null = null;
+    let activeCellForNote: HTMLElement | null = null;
+    let activeCellForPopover: HTMLElement | null = null;
+
+    // Smooth scroll to Today
+    function scrollToToday() {
+      if (todayRow && scrollBox) {
+        todayRow.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+    }
+
+    if (jumpTodayBtn) {
+      jumpTodayBtn.addEventListener('click', scrollToToday);
+    }
+
+    // Auto-scroll on initial load if today exists
+    setTimeout(() => {
+      if (todayRow && scrollBox) {
+        todayRow.scrollIntoView({ behavior: 'auto', block: 'center' });
+      }
+    }, 150);
+
+    // Filter pills (All, Active/Recent, Incomplete)
+    const filterPills = document.querySelectorAll('.filter-pill');
+    filterPills.forEach((pill) => {
+      pill.addEventListener('click', () => {
+        filterPills.forEach((p) => p.classList.remove('active'));
+        pill.classList.add('active');
+        const filter = (pill as HTMLElement).dataset.filter;
+
+        const rows = document.querySelectorAll('.tracker-row');
+        rows.forEach((row) => {
+          const r = row as HTMLElement;
+          if (filter === 'all') {
+            r.style.display = '';
+          } else if (filter === 'current') {
+            const isPast = r.classList.contains('tracker-row-past');
+            const isToday = r.classList.contains('tracker-row-today');
+            r.style.display = isToday || !isPast ? '' : 'none';
+          } else if (filter === 'incomplete') {
+            const summary = r.querySelector('.day-indicator');
+            const isSuccess = summary?.classList.contains('indicator-success');
+            r.style.display = isSuccess ? 'none' : '';
+          }
+        });
+      });
+    });
+
+    // Helper: update cell UI
+    function setCellVisual(cell: HTMLElement, newStatus: string, note?: string) {
+      cell.classList.remove('status-completed', 'status-pending', 'status-missed', 'status-na', 'animate-pop');
+      cell.classList.add(`status-${newStatus}`);
+      cell.dataset.status = newStatus;
+
+      const symbol = cell.querySelector('.cell-symbol');
+      if (symbol) {
+        if (newStatus === 'completed') symbol.textContent = '✓';
+        else if (newStatus === 'pending') symbol.textContent = '○';
+        else if (newStatus === 'missed') symbol.textContent = '✕';
+        else if (newStatus === 'na') symbol.textContent = '—';
+      }
+
+      if (newStatus === 'completed') {
+        cell.classList.add('animate-pop');
+      }
+
+      const actName = cell.dataset.activityName || '';
+      const shortDate = cell.dataset.shortDate || '';
+
+      if (note !== undefined) {
+        cell.dataset.note = note;
+        if (note.trim()) {
+          cell.classList.add('has-note');
+          cell.setAttribute('aria-label', `${actName} on ${shortDate} - This day has a note`);
+          cell.title = `${actName} on ${shortDate}: ${newStatus.toUpperCase()} (Has Note)`;
+        } else {
+          cell.classList.remove('has-note');
+          cell.setAttribute('aria-label', `${actName} on ${shortDate}`);
+          cell.title = `${actName} on ${shortDate}: ${newStatus.toUpperCase()}`;
+        }
+      } else {
+        const hasNote = Boolean(cell.dataset.note && cell.dataset.note.trim());
+        cell.setAttribute('aria-label', `${actName} on ${shortDate}${hasNote ? ' - This day has a note' : ''}`);
+        cell.title = `${actName} on ${shortDate}: ${newStatus.toUpperCase()}${hasNote ? ' (Has Note)' : ''}`;
+      }
+
+      updateRowSummary(cell.closest('tr'));
+    }
+
+    // Recalculate row status client-side optimistically
+    function updateRowSummary(row: HTMLTableRowElement | null) {
+      if (!row) return;
+      const cells = row.querySelectorAll('.grid-cell');
+      let applicable = 0;
+      let completed = 0;
+      let missed = 0;
+
+      cells.forEach((c) => {
+        const status = (c as HTMLElement).dataset.status;
+        if (status === 'completed') {
+          completed++;
+          applicable++;
+        } else if (status === 'missed') {
+          missed++;
+          applicable++;
+        } else if (status === 'pending') {
+          applicable++;
+        }
+      });
+
+      let isSuccess = false;
+      if (applicable > 0) {
+        if (successRule === 'all') isSuccess = completed === applicable;
+        else if (successRule === 'at_least_one') isSuccess = completed >= 1;
+        else if (successRule === 'custom_min') isSuccess = completed >= Math.min(successMin, applicable);
+      }
+
+      const isPerfect = applicable > 0 && completed === applicable;
+      const isPast = row.classList.contains('tracker-row-past');
+      const isMissed = isPast && !isSuccess;
+
+      const indicator = row.querySelector('.day-indicator');
+      if (indicator) {
+        indicator.className = `day-indicator ${isSuccess ? 'indicator-success' : isMissed ? 'indicator-missed' : 'indicator-pending'}`;
+        if (isSuccess) {
+          indicator.textContent = isPerfect ? '★ Perfect' : '✓ Done';
+        } else if (isMissed) {
+          indicator.textContent = '✕ Missed';
+        } else {
+          indicator.textContent = `${completed}/${applicable}`;
+        }
+      }
+    }
+
+    // Persist cell to backend / offline queue
+    async function persistCell(activityId: string, date: string, status: string, note?: string) {
+      if (syncStatus) syncStatus.className = 'sync-indicator syncing';
+      if (syncText) syncText.textContent = 'Saving...';
+
+      if (!navigator.onLine) {
+        queueOfflineRecord({
+          challenge_id: challengeId,
+          activity_id: activityId,
+          date,
+          status,
+          note
+        });
+        if (syncStatus) syncStatus.className = 'sync-indicator offline';
+        if (syncText) syncText.textContent = 'Offline (queued)';
+        return;
+      }
+
+      try {
+        const res = await fetch(`/api/challenges/${challengeId}/record`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ activity_id: activityId, date, status, note })
+        });
+
+        if (res.ok) {
+          const data = await res.json();
+          if (syncStatus) syncStatus.className = 'sync-indicator';
+          if (syncText) syncText.textContent = 'Saved';
+
+          // Update header streak badge
+          const streakEl = document.getElementById('header-streak-badge');
+          if (streakEl && data.currentStreak !== undefined) {
+            streakEl.textContent = `🔥 ${data.currentStreak} day streak`;
+          }
+
+          // Trigger celebration if milestones reached
+          if (data.newlyReachedMilestones && data.newlyReachedMilestones.length > 0) {
+            triggerConfetti();
+            const milestoneEvent = new CustomEvent('streakgrid:milestone', {
+              detail: { milestones: data.newlyReachedMilestones, streak: data.currentStreak }
+            });
+            window.dispatchEvent(milestoneEvent);
+          }
+        } else {
+          throw new Error('Save failed');
+        }
+      } catch (err) {
+        queueOfflineRecord({
+          challenge_id: challengeId,
+          activity_id: activityId,
+          date,
+          status,
+          note
+        });
+        if (syncStatus) syncStatus.className = 'sync-indicator offline';
+        if (syncText) syncText.textContent = 'Saved locally';
+      }
+    }
+
+    // Cell Selection Handling
+    function selectCell(cell: HTMLElement) {
+      if (selectedCell && selectedCell !== cell) {
+        selectedCell.classList.remove('cell-selected');
+      }
+      selectedCell = cell;
+      selectedCell.classList.add('cell-selected');
+
+      const dayNum = cell.dataset.dayNum || '';
+      const note = (cell.dataset.note || '').trim();
+      const hasNote = Boolean(note);
+
+      if (selectedCellControl) {
+        selectedCellControl.style.display = 'inline-flex';
+      }
+      if (selectedCellTitle) {
+        selectedCellTitle.textContent = `Day ${dayNum}`;
+      }
+      if (cellNoteActionText) {
+        cellNoteActionText.textContent = hasNote ? 'Show Note' : 'Add Note';
+      }
+      if (cellNoteActionBtn) {
+        const label = hasNote ? `Show note for Day ${dayNum}` : `Add note for Day ${dayNum}`;
+        cellNoteActionBtn.title = label;
+        cellNoteActionBtn.setAttribute('aria-label', label);
+      }
+    }
+
+    function deselectCell() {
+      if (selectedCell) {
+        selectedCell.classList.remove('cell-selected');
+        selectedCell = null;
+      }
+      if (selectedCellControl) {
+        selectedCellControl.style.display = 'none';
+      }
+    }
+
+    if (btnDeselectCell) {
+      btnDeselectCell.addEventListener('click', deselectCell);
+    }
+
+    // Open Note Viewer / Editor for a cell
+    function openNoteForCell(cell: HTMLElement) {
+      const note = (cell.dataset.note || '').trim();
+      if (note) {
+        openNoteViewer(cell);
+      } else {
+        openNoteEditor(cell);
+      }
+    }
+
+    function openNoteViewer(cell: HTMLElement) {
+      activeCellForNote = cell;
+      const dayNum = cell.dataset.dayNum || '';
+      const actName = cell.dataset.activityName || '';
+      const note = cell.dataset.note || '';
+
+      if (noteViewDayTitle) noteViewDayTitle.textContent = `Day ${dayNum}`;
+      if (noteViewSubTitle) noteViewSubTitle.textContent = actName;
+      if (noteViewText) noteViewText.textContent = note;
+
+      if (noteViewActions) noteViewActions.style.display = 'flex';
+      if (noteDeleteConfirmRow) noteDeleteConfirmRow.style.display = 'none';
+
+      noteEditorCard.style.display = 'none';
+      noteViewCard.style.display = 'flex';
+      noteModalOverlay.style.display = 'flex';
+    }
+
+    function openNoteEditor(cell: HTMLElement) {
+      activeCellForNote = cell;
+      const dayNum = cell.dataset.dayNum || '';
+      const actName = cell.dataset.activityName || '';
+      const note = cell.dataset.note || '';
+      const isEditing = Boolean(note.trim());
+
+      if (noteEditorDayTitle) noteEditorDayTitle.textContent = `Day ${dayNum}`;
+      if (noteEditorSubTitle) noteEditorSubTitle.textContent = isEditing ? `${actName} • Edit Note` : `${actName} • Add Note`;
+      if (noteEditorInput) {
+        noteEditorInput.value = note;
+      }
+      updateCharCounter();
+
+      if (editorDeleteBtn) {
+        editorDeleteBtn.style.display = isEditing ? 'inline-flex' : 'none';
+      }
+
+      noteViewCard.style.display = 'none';
+      noteEditorCard.style.display = 'flex';
+      noteModalOverlay.style.display = 'flex';
+      setTimeout(() => noteEditorInput?.focus(), 50);
+    }
+
+    function closeNoteModal() {
+      noteModalOverlay.style.display = 'none';
+      noteViewCard.style.display = 'none';
+      noteEditorCard.style.display = 'none';
+      activeCellForNote = null;
+    }
+
+    function updateCharCounter() {
+      if (!noteEditorInput || !noteCharCounter) return;
+      const len = noteEditorInput.value.length;
+      noteCharCounter.textContent = `${len}/500`;
+      if (len > 500) {
+        noteCharCounter.classList.add('limit-exceeded');
+        if (btnSaveNote) btnSaveNote.disabled = true;
+      } else {
+        noteCharCounter.classList.remove('limit-exceeded');
+        if (btnSaveNote) btnSaveNote.disabled = false;
+      }
+    }
+
+    if (noteEditorInput) {
+      noteEditorInput.addEventListener('input', updateCharCounter);
+    }
+
+    // Modal Close Buttons
+    if (btnCloseNoteView) btnCloseNoteView.addEventListener('click', closeNoteModal);
+    if (btnCloseNoteEditor) btnCloseNoteEditor.addEventListener('click', closeNoteModal);
+    if (btnCancelNoteEditor) btnCancelNoteEditor.addEventListener('click', closeNoteModal);
+
+    // Note Modal Overlay Click Outside
+    noteModalOverlay.addEventListener('click', (e) => {
+      if (e.target === noteModalOverlay) {
+        closeNoteModal();
+      }
+    });
+
+    // Escape Key closes modal or deselects cell
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        if (noteModalOverlay.style.display !== 'none') {
+          closeNoteModal();
+        } else if (selectedCell) {
+          deselectCell();
+        }
+      }
+    });
+
+    // Toolbar Action Button Click
+    if (cellNoteActionBtn) {
+      cellNoteActionBtn.addEventListener('click', () => {
+        if (selectedCell) {
+          openNoteForCell(selectedCell);
+        }
+      });
+    }
+
+    // Note View: Switch to Edit
+    if (btnEditNote) {
+      btnEditNote.addEventListener('click', () => {
+        if (activeCellForNote) {
+          openNoteEditor(activeCellForNote);
+        }
+      });
+    }
+
+    // Note View: Delete Confirmation Prompt
+    if (btnPromptDeleteNote) {
+      btnPromptDeleteNote.addEventListener('click', () => {
+        if (noteViewActions) noteViewActions.style.display = 'none';
+        if (noteDeleteConfirmRow) noteDeleteConfirmRow.style.display = 'flex';
+      });
+    }
+
+    if (btnCancelDelete) {
+      btnCancelDelete.addEventListener('click', () => {
+        if (noteDeleteConfirmRow) noteDeleteConfirmRow.style.display = 'none';
+        if (noteViewActions) noteViewActions.style.display = 'flex';
+      });
+    }
+
+    // Execute Note Deletion
+    async function executeDeleteNote(cell: HTMLElement) {
+      const actId = cell.dataset.activityId!;
+      const date = cell.dataset.date!;
+      const status = cell.dataset.status || 'pending';
+
+      setCellVisual(cell, status, '');
+      await persistCell(actId, date, status, '');
+      selectCell(cell);
+      closeNoteModal();
+    }
+
+    if (btnConfirmDelete) {
+      btnConfirmDelete.addEventListener('click', () => {
+        if (activeCellForNote) {
+          executeDeleteNote(activeCellForNote);
+        }
+      });
+    }
+
+    if (editorDeleteBtn) {
+      editorDeleteBtn.addEventListener('click', () => {
+        if (activeCellForNote) {
+          executeDeleteNote(activeCellForNote);
+        }
+      });
+    }
+
+    // Save Note
+    if (btnSaveNote) {
+      btnSaveNote.addEventListener('click', async () => {
+        if (!activeCellForNote || !noteEditorInput) return;
+        const newNote = noteEditorInput.value.trim().slice(0, 500);
+        const actId = activeCellForNote.dataset.activityId!;
+        const date = activeCellForNote.dataset.date!;
+        const status = activeCellForNote.dataset.status || 'pending';
+
+        setCellVisual(activeCellForNote, status, newNote);
+        await persistCell(actId, date, status, newNote);
+        selectCell(activeCellForNote);
+        closeNoteModal();
+      });
+    }
+
+    // Attach Cell Click & Double-Click Handlers
+    document.querySelectorAll('.grid-cell').forEach((cell) => {
+      const c = cell as HTMLElement;
+
+      // Single click: toggle Completed <-> Pending & select cell
+      c.addEventListener('click', (e) => {
+        // Prevent toggle if popover is open
+        if (popover.style.display !== 'none') return;
+        // If double clicking in rapid succession, don't flip back and forth
+        if (e.detail > 1) return;
+
+        const currentStatus = c.dataset.status || 'pending';
+        const newStatus = currentStatus === 'completed' ? 'pending' : 'completed';
+        const actId = c.dataset.activityId!;
+        const date = c.dataset.date!;
+        const note = c.dataset.note || '';
+
+        setCellVisual(c, newStatus);
+        persistCell(actId, date, newStatus, note);
+        selectCell(c);
+      });
+
+      // Desktop Double click: opens note editor/viewer
+      c.addEventListener('dblclick', (e) => {
+        e.preventDefault();
+        selectCell(c);
+        openNoteForCell(c);
+      });
+
+      // Right-click contextmenu for status selection
+      c.addEventListener('contextmenu', (e) => {
+        e.preventDefault();
+        selectCell(c);
+        openPopover(c);
+      });
+    });
+
+    // Right-Click Status Popover handling
+    function openPopover(cell: HTMLElement) {
+      activeCellForPopover = cell;
+      const date = cell.dataset.date || '';
+      const actName = cell.dataset.activityName || '';
+
+      if (popoverTitle) {
+        popoverTitle.textContent = `${actName} • ${date}`;
+      }
+
+      const rect = cell.getBoundingClientRect();
+      const popoverWidth = 220;
+      let left = rect.left + window.scrollX;
+      let top = rect.bottom + window.scrollY + 6;
+
+      if (left + popoverWidth > window.innerWidth - 16) {
+        left = window.innerWidth - popoverWidth - 16;
+      }
+      if (top + 160 > window.innerHeight + window.scrollY) {
+        top = rect.top + window.scrollY - 160;
+      }
+
+      popover.style.left = `${Math.max(16, left)}px`;
+      popover.style.top = `${top}px`;
+      popover.style.display = 'flex';
+    }
+
+    function closePopover() {
+      popover.style.display = 'none';
+      activeCellForPopover = null;
+    }
+
+    if (popoverClose) popoverClose.addEventListener('click', closePopover);
+
+    popover.querySelectorAll('.popover-opt').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        if (!activeCellForPopover) return;
+        const newStatus = (btn as HTMLElement).dataset.setStatus!;
+        const actId = activeCellForPopover.dataset.activityId!;
+        const date = activeCellForPopover.dataset.date!;
+        const note = activeCellForPopover.dataset.note || '';
+
+        setCellVisual(activeCellForPopover, newStatus);
+        persistCell(actId, date, newStatus, note);
+        selectCell(activeCellForPopover);
+        closePopover();
+      });
+    });
+
+    // Close right-click popover when clicking outside
+    document.addEventListener('click', (e) => {
+      const target = e.target as HTMLElement;
+      if (
+        popover.style.display !== 'none' &&
+        !popover.contains(target) &&
+        !target.classList.contains('grid-cell')
+      ) {
+        closePopover();
+      }
+    });
+
+    // Listen for offline queue synced event
+    window.addEventListener('streakgrid:synced', () => {
+      if (syncStatus) syncStatus.className = 'sync-indicator';
+      if (syncText) syncText.textContent = 'Synced';
+    });
+  }
+</script>

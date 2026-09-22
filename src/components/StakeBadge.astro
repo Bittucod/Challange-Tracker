@@ -1,0 +1,93 @@
+---
+import { formatCurrencyAmount } from '../lib/config';
+import { formatStakeStatus } from '../lib/stakes';
+import type { StakeCommitment } from '../lib/types';
+
+interface Props {
+  commitment?: StakeCommitment | null;
+  challengeType?: string;
+  showAmount?: boolean;
+}
+
+const { commitment, challengeType = 'free', showAmount = true } = Astro.props;
+
+const isStake = challengeType === 'stake' || Boolean(commitment);
+const status = commitment?.status || (isStake ? 'active' : 'free');
+const formatted = formatStakeStatus(status);
+const displayAmount = commitment && showAmount ? formatCurrencyAmount(commitment.amount, commitment.currency) : '';
+---
+
+<div class={`stake-badge-pill ${formatted.badgeClass}`}>
+  <span class="badge-status-dot"></span>
+  <span class="badge-status-text">{formatted.label}</span>
+  {displayAmount && status === 'active' && (
+    <span class="badge-amount-chip">{displayAmount}</span>
+  )}
+</div>
+
+<style>
+  .stake-badge-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 3px 8px;
+    border-radius: var(--radius-sm);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+    user-select: none;
+    line-height: 1.2;
+    white-space: nowrap;
+  }
+
+  .badge-status-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: currentColor;
+    flex-shrink: 0;
+  }
+
+  .badge-stake-active {
+    background: #FEF3C7;
+    color: #B45309;
+    border: 1px solid rgba(245, 158, 11, 0.35);
+  }
+
+  .badge-stake-success {
+    background: #ECFDF5;
+    color: #15803D;
+    border: 1px solid rgba(34, 197, 94, 0.35);
+  }
+
+  .badge-stake-missed {
+    background: #F4F4F0;
+    color: #777B78;
+    border: 1px solid var(--color-border);
+  }
+
+  .badge-stake-dispute {
+    background: #EFF6FF;
+    color: #1D4ED8;
+    border: 1px solid rgba(59, 130, 246, 0.35);
+  }
+
+  .badge-stake-pending {
+    background: #FFFBEB;
+    color: #D97706;
+    border: 1px solid rgba(245, 158, 11, 0.25);
+  }
+
+  .badge-neutral {
+    background: var(--color-surface-subtle);
+    color: var(--color-muted);
+    border: 1px solid var(--color-border);
+  }
+
+  .badge-amount-chip {
+    padding: 1px 5px;
+    border-radius: 3px;
+    background: rgba(0, 0, 0, 0.08);
+    font-variant-numeric: tabular-nums;
+  }
+</style>

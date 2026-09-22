@@ -1,82 +1,43 @@
-# 🎬 Video Editor Hiring Web Application
+# Astro Starter Kit: Minimal
 
-A complete, lightweight, and modern recruitment platform built with **Node.js, Express, SQLite3, and Vanilla HTML/CSS/JS + Tailwind CSS**.
-
----
-
-## ⚡ Quick Start
-
-### 1. Install Dependencies
-```bash
-npm install
+```sh
+npm create astro@latest -- --template minimal
 ```
 
-### 2. Configure Environment (Optional)
-A default `.env` is created automatically with:
-```env
-PORT=3000
-ADMIN_PASSWORD=admin123
-```
-You can change `ADMIN_PASSWORD` anytime to your desired secret password.
+> 🧑‍🚀 **Seasoned astronaut?** Delete this file. Have fun!
 
-### 3. Start the Server
-```bash
-# Start production server
-node server.js
-# or
-npm start
+## 🚀 Project Structure
 
-# Or start with automatic reloading (Node 18+)
-npm run dev
+Inside of your Astro project, you'll see the following folders and files:
+
+```text
+/
+├── public/
+├── src/
+│   └── pages/
+│       └── index.astro
+└── package.json
 ```
 
-### 4. Open in Browser
-- 🌐 **Public Hiring Page**: [http://localhost:3000](http://localhost:3000)
-- 🔒 **Admin Portal**: [http://localhost:3000/admin.html](http://localhost:3000/admin.html) *(Password: `admin123`)*
+Astro looks for `.astro` or `.md` files in the `src/pages/` directory. Each page is exposed as a route based on its file name.
 
----
+There's nothing special about `src/components/`, but that's where we like to put any Astro/React/Vue/Svelte/Preact components.
 
-## ✨ Features
+Any static assets, like images, can be placed in the `public/` directory.
 
-### 🌟 Public Application Page (`public/index.html`)
-- **Hero & Transparent Compensation**: Pay-per-video rates for Short-Form ($25–$45), YouTube Long-Form ($75–$150), and Lead Editor Retainers ($1,200+/month) with terms, turnarounds, and bonuses.
-- **Sample Task Video Section**: Instructions to download raw 28-second test footage, editing criteria (pacing, captions, sound design, color grade), and direct asset download button.
-- **Application Form**:
-  - Full Name (Mandatory)
-  - City / Location (Optional)
-  - Video Editing Experience (Beginner / 1-2 Years / 3+ Years)
-  - Past Channels / Projects with "Never worked before" fresh talent toggle
-  - WhatsApp Number with country code validation (Mandatory)
-  - Alternative Phone, Telegram handle, Instagram handle
-  - Multi-skill selectors (Premiere Pro, After Effects, DaVinci Resolve, CapCut, etc.)
-  - Edited Task Submission Link (Mandatory: Google Drive / YouTube)
-  - Success modal with application ID.
+## 🧞 Commands
 
-### 🛡️ Private Admin Dashboard (`public/admin.html`)
-- **Password Gate**: Protected with session-persisted admin token.
-- **Metrics Bar**: Total Applicants, Submitted Today, Pending Review, Reviewing, Shortlisted, Hired.
-- **Direct WhatsApp Chat**: One-click `https://wa.me/...` button with prefilled candidate greeting.
-- **Interactive Review Flow**: Change status directly (`Pending`, `Reviewing`, `Shortlisted`, `Hired`, `Rejected`) with instant sync.
-- **Search & Filters**: Live search by name, phone, handle, or skills; filter by experience level or status.
-- **Table & Grid Views**: Toggle between compact table and visual card layout.
-- **Full Details Modal**: View all candidate socials, portfolio, and save reviewer notes.
-- **Candidate Deletion**: Delete rejected or test candidates with confirmation dialog.
+All commands are run from the root of the project, from a terminal:
 
-### 🔌 API Endpoints
+| Command                   | Action                                           |
+| :------------------------ | :----------------------------------------------- |
+| `npm install`             | Installs dependencies                            |
+| `npm run dev`             | Starts local dev server at `localhost:4321`      |
+| `npm run build`           | Build your production site to `./dist/`          |
+| `npm run preview`         | Preview your build locally, before deploying     |
+| `npm run astro ...`       | Run CLI commands like `astro add`, `astro check` |
+| `npm run astro -- --help` | Get help using the Astro CLI                     |
 
-| Method | Route | Description | Auth Required |
-|---|---|---|---|
-| `POST` | `/api/apply` | Submit new editor application | No |
-| `POST` | `/api/admin/verify` | Verify admin password | No |
-| `GET` | `/api/admin/stats` | Overview submission counts | Yes (`x-admin-password`) |
-| `GET` | `/api/admin/applications` | List submissions with filters | Yes (`x-admin-password`) |
-| `GET` | `/api/admin/applications/:id` | Get single application | Yes (`x-admin-password`) |
-| `PATCH` | `/api/admin/applications/:id` | Update candidate status & notes | Yes (`x-admin-password`) |
-| `DELETE` | `/api/admin/applications/:id` | Delete candidate application | Yes (`x-admin-password`) |
-| `GET` | `/api/health` | Health check endpoint | No |
+## 👀 Want to learn more?
 
----
-
-## 🗄️ Database
-
-Uses a self-contained SQLite database stored at `applications.db`. No database server installation required. Tables and indexes are created automatically on the first run.
+Feel free to check [our documentation](https://docs.astro.build) or jump into our [Discord server](https://astro.build/chat).

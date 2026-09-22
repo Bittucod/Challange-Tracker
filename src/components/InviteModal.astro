@@ -1,0 +1,157 @@
+---
+import Icons from './Icons.astro';
+---
+
+<div id="invite-modal" class="modal-overlay" role="dialog" aria-modal="true">
+  <div class="modal-content invite-modal-content">
+    <div class="invite-header">
+      <div class="invite-title-wrap">
+        <h3 class="invite-title">Invite Friends & Accountability Partners</h3>
+        <p class="invite-sub">
+          «I'm putting real commitment behind my challenge. Join me and build alongside me.»
+        </p>
+      </div>
+      <button id="btn-close-invite" class="btn-icon" aria-label="Close modal">
+        <Icons name="close" size={16} />
+      </button>
+    </div>
+
+    <div class="invite-input-group">
+      <input
+        type="text"
+        id="invite-link-field"
+        class="form-input"
+        readonly
+        value="Loading link..."
+      />
+      <button id="btn-copy-invite-link" class="btn btn-primary" type="button">
+        <Icons name="copy" size={15} />
+        <span id="copy-invite-text">Copy Link</span>
+      </button>
+    </div>
+
+    <div class="invite-footer">
+      <button id="btn-native-share" class="btn btn-secondary w-full" type="button">
+        <Icons name="share" size={15} />
+        <span>Share via Mobile / Apps</span>
+      </button>
+    </div>
+  </div>
+</div>
+
+<style>
+  .invite-modal-content {
+    max-width: 460px;
+    padding: 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .invite-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+  }
+
+  .invite-title {
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--color-text);
+  }
+
+  .invite-sub {
+    font-size: 13px;
+    color: var(--color-text-secondary);
+    margin-top: 4px;
+    font-style: italic;
+    line-height: 1.4;
+  }
+
+  .invite-input-group {
+    display: flex;
+    gap: 8px;
+  }
+
+  .w-full {
+    width: 100%;
+  }
+</style>
+
+<script>
+  const modal = document.getElementById('invite-modal');
+  const closeBtn = document.getElementById('btn-close-invite');
+  const copyBtn = document.getElementById('btn-copy-invite-link');
+  const copyText = document.getElementById('copy-invite-text');
+  const linkField = document.getElementById('invite-link-field') as HTMLInputElement;
+  const nativeShareBtn = document.getElementById('btn-native-share');
+  const openInviteBtn = document.getElementById('btn-open-invite');
+
+  let inviteUrl = '';
+
+  async function fetchInviteLink() {
+    try {
+      const res = await fetch('/api/invites');
+      if (res.ok) {
+        const data = await res.json();
+        inviteUrl = data.url;
+        if (linkField) linkField.value = data.url;
+      }
+    } catch (err) {
+      console.error('Failed to fetch invite link:', err);
+    }
+  }
+
+  function openModal() {
+    if (modal) {
+      modal.classList.add('active');
+      fetchInviteLink();
+    }
+  }
+
+  function closeModal() {
+    if (modal) modal.classList.remove('active');
+  }
+
+  if (openInviteBtn) openInviteBtn.addEventListener('click', openModal);
+  if (closeBtn) closeBtn.addEventListener('click', closeModal);
+
+  if (modal) {
+    modal.addEventListener('click', (e) => {
+      if (e.target === modal) closeModal();
+    });
+  }
+
+  if (copyBtn && linkField && copyText) {
+    copyBtn.addEventListener('click', async () => {
+      try {
+        await navigator.clipboard.writeText(linkField.value);
+        copyText.textContent = 'Copied!';
+        setTimeout(() => {
+          copyText.textContent = 'Copy Link';
+        }, 2000);
+      } catch {
+        linkField.select();
+        document.execCommand('copy');
+        copyText.textContent = 'Copied!';
+      }
+    });
+  }
+
+  if (nativeShareBtn) {
+    nativeShareBtn.addEventListener('click', async () => {
+      if (navigator.share) {
+        try {
+          await navigator.share({
+            title: 'Join me on StreakGrid',
+            text: "I'm putting a real commitment behind my challenge. Join me and build alongside me on StreakGrid.",
+            url: inviteUrl || window.location.origin
+          });
+        } catch {}
+      } else if (copyBtn) {
+        copyBtn.click();
+      }
+    });
+  }
+</script>

@@ -1,0 +1,214 @@
+---
+import Icons from './Icons.astro';
+import { getChallengeStakeCommitment } from '../lib/stakes';
+import { formatCurrencyAmount } from '../lib/config';
+import type { Challenge, Activity, ChallengeAnalytics } from '../lib/types';
+
+interface Props {
+  challenge: Challenge;
+  activities: Activity[];
+  analytics: ChallengeAnalytics;
+}
+
+const { challenge, activities, analytics } = Astro.props;
+
+const commitment = getChallengeStakeCommitment(challenge.id);
+const isStake = challenge.challenge_type === 'stake' || Boolean(commitment);
+const stakeAmountText = commitment && challenge.show_stake_amount !== 0 ? formatCurrencyAmount(commitment.amount, commitment.currency) : '';
+
+// Pass serialized data to client
+const initialShareData = {
+  challengeName: challenge.name,
+  dayNumber: analytics.currentDayNumber,
+  totalDays: challenge.duration,
+  currentStreak: analytics.currentStreak,
+  isStake,
+  stakeAmountText,
+  activities: analytics.activityStats.map((s) => ({
+    name: s.activity.name,
+    completedCount: s.completedDays
+  }))
+};
+
+const shareTweetText = isStake
+  ? `I put a real stake behind my ${challenge.duration}-day challenge (${challenge.name}). Day ${analytics.currentDayNumber}/${challenge.duration} • 🔥 ${analytics.currentStreak} day streak. Still in.\n\nTracked with @StreakGrid`
+  : `Day ${analytics.currentDayNumber}/${challenge.duration} of my ${challenge.name} challenge! 🔥 ${analytics.currentStreak} day streak.\n\nTracked with @StreakGrid`;
+---
+
+<div id="share-card-modal" class="modal-overlay" role="dialog" aria-modal="true" data-share-data={JSON.stringify(initialShareData)}>
+  <div class="modal-content share-modal-content">
+    <div class="share-modal-header">
+      <div class="header-left">
+        <h3 class="share-modal-title">Share Progress Card</h3>
+        <p class="share-modal-subtitle">Generate a clean screenshot-worthy card for X, LinkedIn, or Stories.</p>
+      </div>
+      <button id="btn-close-share" class="btn-icon" aria-label="Close modal">
+        <Icons name="close" size={16} />
+      </button>
+    </div>
+
+    <!-- Canvas Preview Box -->
+    <div class="canvas-preview-container">
+      <canvas id="share-card-canvas" width="1200" height="630"></canvas>
+    </div>
+
+    <!-- Action Toolbar -->
+    <div class="share-modal-actions">
+      <button id="btn-copy-card-image" class="btn btn-secondary">
+        <Icons name="copy" size={15} />
+        <span id="copy-text">Copy Image</span>
+      </button>
+
+      <button id="btn-download-card-image" class="btn btn-primary">
+        <Icons name="share" size={15} />
+        <span>Download PNG</span>
+      </button>
+
+      <a
+        id="btn-share-x"
+        class="btn btn-outline"
+        target="_blank"
+        rel="noopener noreferrer"
+        href={`https://twitter.com/intent/tweet?text=${encodeURIComponent(shareTweetText)}`}
+      >
+        <Icons name="x" size={14} />
+        <span>Share on X</span>
+      </a>
+    </div>
+  </div>
+</div>
+
+<style>
+  .share-modal-content {
+    max-width: 680px;
+    padding: 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .share-modal-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+  }
+
+  .share-modal-title {
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--color-text);
+  }
+
+  .share-modal-subtitle {
+    font-size: 13px;
+    color: var(--color-muted);
+  }
+
+  .canvas-preview-container {
+    width: 100%;
+    aspect-ratio: 1200 / 630;
+    border-radius: var(--radius-panel);
+    border: 1px solid var(--color-border);
+    overflow: hidden;
+    background: #FAFAF7;
+    box-shadow: var(--shadow-sm);
+  }
+
+  #share-card-canvas {
+    width: 100%;
+    height: 100%;
+    display: block;
+    object-fit: contain;
+  }
+
+  .share-modal-actions {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+</style>
+
+<script>
+  import { drawShareCard, downloadCardAsPng, copyCardToClipboard } from '../scripts/share-card';
+
+  const modal = document.getElementById('share-card-modal');
+  if (modal) {
+    const rawData = modal.dataset.shareData;
+    const shareData = rawData ? JSON.parse(rawData) : null;
+    const canvas = document.getElementById('share-card-canvas') as HTMLCanvasElement;
+    const closeBtn = document.getElementById('btn-close-share');
+    const downloadBtn = document.getElementById('btn-download-card-image');
+    const copyBtn = document.getElementById('btn-copy-card-image');
+    const copyText = document.getElementById('copy-text');
+
+    function renderCard(milestoneTitle?: string) {
+      if (canvas && shareData) {
+        drawShareCard(canvas, {
+          ...shareData,
+          milestoneTitle: milestoneTitle || shareData.milestoneTitle
+        });
+      }
+    }
+
+    function openModal(milestoneTitle?: string) {
+      modal.classList.add('active');
+      renderCard(milestoneTitle);
+    }
+
+    function closeModal() {
+      modal.classList.remove('active');
+    }
+
+    if (closeBtn) closeBtn.addEventListener('click', closeModal);
+
+    modal.addEventListener('click', (e) => {
+      if (e.target === modal) closeModal();
+    });
+
+    // Download button
+    if (downloadBtn && canvas) {
+      downloadBtn.addEventListener('click', () => {
+        downloadCardAsPng(canvas, 'streakgrid-progress.png');
+      });
+    }
+
+    // Copy button
+    if (copyBtn && canvas && copyText) {
+      copyBtn.addEventListener('click', async () => {
+        copyText.textContent = 'Copying...';
+        const ok = await copyCardToClipboard(canvas);
+        if (ok) {
+          copyText.textContent = 'Copied!';
+          setTimeout(() => {
+            copyText.textContent = 'Copy Image';
+          }, 2000);
+        } else {
+          copyText.textContent = 'Failed to copy';
+          setTimeout(() => {
+            copyText.textContent = 'Copy Image';
+          }, 2000);
+        }
+      });
+    }
+
+    // Header share button trigger
+    const headerShareBtn = document.getElementById('btn-open-share-card');
+    if (headerShareBtn) {
+      headerShareBtn.addEventListener('click', () => openModal());
+    }
+
+    // Custom event listener from milestone celebration
+    window.addEventListener('streakgrid:open-share', (e: any) => {
+      const detail = e.detail;
+      openModal(detail?.milestoneTitle);
+    });
+
+    // Initial draw
+    if (canvas && shareData) {
+      drawShareCard(canvas, shareData);
+    }
+  }
+</script>

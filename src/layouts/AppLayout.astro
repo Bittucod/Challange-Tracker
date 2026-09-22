@@ -1,0 +1,775 @@
+---
+import Layout from './Layout.astro';
+import Icons from '../components/Icons.astro';
+import MilestoneModal from '../components/MilestoneModal.astro';
+import InviteModal from '../components/InviteModal.astro';
+import PwaPrompt from '../components/PwaPrompt.astro';
+import { getUserFromCookies } from '../lib/auth';
+import { db } from '../lib/db';
+import { CONFIG } from '../lib/config';
+import type { Challenge, InAppNotification } from '../lib/types';
+
+interface Props {
+  title?: string;
+  activeChallengeId?: string;
+}
+
+const { title = 'StreakGrid App', activeChallengeId } = Astro.props;
+
+const user = getUserFromCookies(Astro.cookies);
+if (!user) {
+  return Astro.redirect('/login');
+}
+
+const isAdmin = Boolean(user.is_admin) || CONFIG.adminEmails.includes(user.email.toLowerCase());
+
+const userChallenges = db
+  .prepare('SELECT id, name, duration, start_date FROM challenges WHERE user_id = ? AND is_archived = 0 ORDER BY created_at DESC')
+  .all(user.id) as Challenge[];
+
+const userNotifications = db
+  .prepare('SELECT * FROM notifications WHERE user_id = ? ORDER BY created_at DESC LIMIT 10')
+  .all(user.id) as InAppNotification[];
+
+const unreadNotifsCount = userNotifications.filter((n) => n.is_read === 0).length;
+
+const activeChallenge = userChallenges.find((c) => c.id === activeChallengeId) || userChallenges[0];
+const pathname = Astro.url.pathname;
+---
+
+<Layout title={`${activeChallenge ? activeChallenge.name + ' • ' : ''}${title}`}>
+  <div class="app-viewport">
+    <!-- Main Top Navbar -->
+    <header class="app-header">
+      <div class="header-inner">
+        <div class="header-left">
+          <a href="/app" class="brand-link" title="StreakGrid Dashboard">
+            <div class="brand-badge">
+              <span class="brand-icon">✓</span>
+            </div>
+            <span class="brand-name">StreakGrid</span>
+          </a>
+
+          {userChallenges.length > 0 && (
+            <div class="challenge-switcher">
+              <button id="btn-challenge-picker" class="picker-trigger" type="button">
+                <span class="picker-label">{activeChallenge ? activeChallenge.name : 'Select Challenge'}</span>
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
+              </button>
+
+              <div id="challenge-dropdown" class="picker-dropdown" style="display: none;">
+                <div class="dropdown-header">Your Challenges</div>
+                <div class="dropdown-list">
+                  {userChallenges.map((c) => (
+                    <a href={`/app/challenges/${c.id}`} class={`dropdown-item ${c.id === activeChallengeId ? 'selected' : ''}`}>
+                      <span class="c-name">{c.name}</span>
+                      <span class="c-days">{c.duration}d</span>
+                    </a>
+                  ))}
+                </div>
+                <div class="dropdown-footer">
+                  <a href="/app/challenges/new" class="dropdown-new-btn">
+                    <Icons name="plus" size={13} />
+                    <span>Create New Challenge</span>
+                  </a>
+                </div>
+              </div>
+            </div>
+          )}
+
+          <!-- App Navigation Links -->
+          <nav class="app-nav-bar">
+            <a href="/app" class={`nav-link ${pathname === '/app' || pathname.startsWith('/app/challenges') ? 'active' : ''}`}>
+              Tracker
+            </a>
+            <a href="/community" class={`nav-link ${pathname === '/community' ? 'active' : ''}`}>
+              Community
+            </a>
+            <a href="/app/commitments" class={`nav-link ${pathname === '/app/commitments' ? 'active' : ''}`}>
+              My Commitments
+            </a>
+            <a href="/app/profile" class={`nav-link ${pathname === '/app/profile' ? 'active' : ''}`}>
+              Profile
+            </a>
+            {isAdmin && (
+              <a href="/admin" class="nav-link admin-nav-link">
+                Admin
+              </a>
+            )}
+          </nav>
+        </div>
+
+        <div class="header-right">
+          <!-- Notifications Bell & Dropdown -->
+          <div class="notification-wrap">
+            <button id="btn-notifications-toggle" class="btn-icon notif-bell-btn" type="button" title="Notifications">
+              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
+                <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
+              </svg>
+              {unreadNotifsCount > 0 && <span id="notif-badge" class="notif-badge-dot">{unreadNotifsCount}</span>}
+            </button>
+
+            <div id="notifications-dropdown" class="notifications-dropdown" style="display: none;">
+              <div class="notif-drop-header">
+                <span class="notif-drop-title">Notifications</span>
+                {unreadNotifsCount > 0 && (
+                  <button type="button" id="btn-mark-all-read" class="btn-mark-read">
+                    Mark all read
+                  </button>
+                )}
+              </div>
+              <div class="notif-list">
+                {userNotifications.length === 0 ? (
+                  <div class="notif-empty">No notifications yet</div>
+                ) : (
+                  userNotifications.map((n) => (
+                    <div class={`notif-item ${n.is_read ? 'read' : 'unread'}`} data-id={n.id}>
+                      <div class="notif-item-title">{n.title}</div>
+                      <div class="notif-item-msg">{n.message}</div>
+                      <div class="notif-item-time">{new Date(n.created_at).toLocaleDateString()}</div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+          </div>
+
+          <a href="/app/challenges/new" class="btn btn-secondary btn-sm new-btn-nav">
+            <Icons name="plus" size={14} />
+            <span>New Challenge</span>
+          </a>
+
+          <div class="user-menu-wrap">
+            <a href="/app/profile" class="user-greeting" title={user.email}>{user.name}</a>
+            <button id="btn-header-logout" class="btn-icon logout-btn" title="Sign out" type="button">
+              <Icons name="logout" size={16} />
+            </button>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <!-- Main Content Area -->
+    <main class="app-main-content">
+      <slot />
+    </main>
+
+    <!-- Mobile Bottom Navigation Bar -->
+    <nav class="mobile-bottom-nav">
+      <a href="/app" class={`m-nav-item ${pathname.startsWith('/app/challenges') || pathname === '/app' ? 'active' : ''}`}>
+        <Icons name="target" size={18} />
+        <span>Tracker</span>
+      </a>
+      <a href="/community" class={`m-nav-item ${pathname === '/community' ? 'active' : ''}`}>
+        <Icons name="share" size={18} />
+        <span>Community</span>
+      </a>
+      <a href="/app/commitments" class={`m-nav-item ${pathname === '/app/commitments' ? 'active' : ''}`}>
+        <span class="m-nav-flame">🔥</span>
+        <span>Stakes</span>
+      </a>
+      <a href="/app/profile" class={`m-nav-item ${pathname === '/app/profile' ? 'active' : ''}`}>
+        <Icons name="check" size={18} />
+        <span>Profile</span>
+      </a>
+    </nav>
+
+    <!-- Modals and overlays -->
+    <MilestoneModal />
+    <InviteModal />
+    <PwaPrompt />
+
+    <!-- Sign Out Confirmation Modal -->
+    <div id="logout-confirm-modal" class="modal-overlay" role="dialog" aria-modal="true">
+      <div class="modal-content logout-modal-card">
+        <div class="logout-icon-circle">
+          <Icons name="logout" size={22} />
+        </div>
+        <div class="logout-modal-text">
+          <h3 class="logout-modal-title">Sign Out</h3>
+          <p class="logout-modal-desc">Do you really want to sign out of your account?</p>
+        </div>
+        <div class="logout-modal-actions">
+          <button id="btn-logout-cancel" class="btn btn-secondary" type="button">No, Stay</button>
+          <a href="/api/auth/logout" class="btn btn-primary btn-logout-confirm">Yes, Sign Out</a>
+        </div>
+      </div>
+    </div>
+  </div>
+</Layout>
+
+<style>
+  .app-viewport {
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+    background-color: var(--color-bg);
+  }
+
+  .app-header {
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    background: rgba(250, 250, 247, 0.94);
+    backdrop-filter: blur(8px);
+    border-bottom: 1px solid var(--color-border);
+  }
+
+  .header-inner {
+    max-width: 1440px;
+    margin: 0 auto;
+    padding: 10px 20px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+  }
+
+  .header-left {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+
+  .brand-link {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-weight: 700;
+    font-size: 16px;
+    letter-spacing: -0.02em;
+    color: var(--color-text);
+  }
+
+  .brand-badge {
+    width: 26px;
+    height: 26px;
+    background: var(--color-primary);
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #FFFFFF;
+    font-weight: 800;
+    font-size: 15px;
+  }
+
+  .app-nav-bar {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-left: 8px;
+  }
+
+  .nav-link {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--color-text-secondary);
+    padding: 5px 10px;
+    border-radius: var(--radius-sm);
+    transition: all 0.1s ease;
+  }
+
+  .nav-link:hover {
+    color: var(--color-text);
+    background: var(--color-surface-hover);
+  }
+
+  .nav-link.active {
+    color: var(--color-primary-hover);
+    background: var(--color-primary-light);
+    font-weight: 600;
+  }
+
+  .admin-nav-link {
+    color: #DC2626;
+    font-weight: 600;
+  }
+
+  /* Challenge Switcher Dropdown */
+  .challenge-switcher {
+    position: relative;
+  }
+
+  .picker-trigger {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 5px 10px;
+    border-radius: var(--radius-sm);
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--color-text);
+    transition: all 0.1s ease;
+  }
+
+  .picker-trigger:hover {
+    background: var(--color-surface-hover);
+  }
+
+  .picker-dropdown {
+    position: absolute;
+    top: calc(100% + 6px);
+    left: 0;
+    width: 240px;
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-panel);
+    box-shadow: var(--shadow-lg);
+    z-index: 1000;
+    padding: 6px;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .dropdown-header {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--color-muted);
+    padding: 6px 8px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+
+  .dropdown-list {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    max-height: 200px;
+    overflow-y: auto;
+  }
+
+  .dropdown-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 7px 8px;
+    border-radius: 6px;
+    font-size: 13px;
+    color: var(--color-text);
+    transition: background 0.1s ease;
+  }
+
+  .dropdown-item:hover {
+    background: var(--color-surface-hover);
+  }
+
+  .dropdown-item.selected {
+    background: var(--color-primary-light);
+    color: var(--color-primary-hover);
+    font-weight: 600;
+  }
+
+  .c-days {
+    font-size: 11px;
+    color: var(--color-muted);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .dropdown-footer {
+    margin-top: 4px;
+    padding-top: 4px;
+    border-top: 1px solid var(--color-border-subtle);
+  }
+
+  .dropdown-new-btn {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 8px;
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--color-primary-hover);
+    border-radius: 6px;
+  }
+
+  .dropdown-new-btn:hover {
+    background: var(--color-surface-hover);
+  }
+
+  .header-right {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  /* Notifications Dropdown */
+  .notification-wrap {
+    position: relative;
+  }
+
+  .notif-bell-btn {
+    position: relative;
+    color: var(--color-text-secondary);
+    padding: 6px;
+    border-radius: var(--radius-sm);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.1s ease;
+  }
+
+  .notif-bell-btn:hover {
+    color: var(--color-text);
+    background: var(--color-surface-hover);
+  }
+
+  .notif-badge-dot {
+    position: absolute;
+    top: 2px;
+    right: 2px;
+    background: var(--color-primary-hover);
+    color: #FFFFFF;
+    font-size: 10px;
+    font-weight: 700;
+    min-width: 15px;
+    height: 15px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0 3px;
+  }
+
+  .notifications-dropdown {
+    position: absolute;
+    top: calc(100% + 8px);
+    right: 0;
+    width: 310px;
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-panel);
+    box-shadow: var(--shadow-lg);
+    z-index: 1000;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    animation: subtleFadeIn 0.15s ease;
+  }
+
+  .notif-drop-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--color-border-subtle);
+    background: var(--color-surface-subtle);
+  }
+
+  .notif-drop-title {
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--color-text);
+  }
+
+  .btn-mark-read {
+    background: none;
+    border: none;
+    font-size: 11px;
+    color: var(--color-primary-hover);
+    font-weight: 600;
+    cursor: pointer;
+  }
+
+  .btn-mark-read:hover {
+    text-decoration: underline;
+  }
+
+  .notif-list {
+    max-height: 280px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .notif-item {
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--color-border-subtle);
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    transition: background 0.1s ease;
+  }
+
+  .notif-item:last-child {
+    border-bottom: none;
+  }
+
+  .notif-item.unread {
+    background: #F4FAF6;
+    border-left: 3px solid var(--color-primary-hover);
+  }
+
+  .notif-item-title {
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--color-text);
+  }
+
+  .notif-item-msg {
+    font-size: 11px;
+    color: var(--color-text-secondary);
+    line-height: 1.4;
+  }
+
+  .notif-item-time {
+    font-size: 10px;
+    color: var(--color-muted);
+    margin-top: 2px;
+  }
+
+  .notif-empty {
+    padding: 24px 16px;
+    text-align: center;
+    font-size: 12px;
+    color: var(--color-muted);
+  }
+
+  .user-menu-wrap {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding-left: 10px;
+    border-left: 1px solid var(--color-border);
+  }
+
+  .user-greeting {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--color-text-secondary);
+  }
+
+  .user-greeting:hover {
+    color: var(--color-text);
+  }
+
+  .logout-btn {
+    color: var(--color-muted);
+  }
+
+  .logout-btn:hover {
+    color: var(--color-missed);
+  }
+
+  .app-main-content {
+    flex: 1;
+    max-width: 1440px;
+    width: 100%;
+    margin: 0 auto;
+    padding: 20px 20px 60px 20px;
+  }
+
+  /* Mobile Bottom Navigation */
+  .mobile-bottom-nav {
+    display: none;
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: rgba(255, 255, 255, 0.96);
+    backdrop-filter: blur(8px);
+    border-top: 1px solid var(--color-border);
+    padding: 6px 12px;
+    z-index: 90;
+    justify-content: space-around;
+    align-items: center;
+  }
+
+  .m-nav-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 3px;
+    font-size: 10px;
+    color: var(--color-muted);
+    padding: 4px 10px;
+    border-radius: var(--radius-sm);
+  }
+
+  .m-nav-item.active {
+    color: var(--color-primary-hover);
+    font-weight: 600;
+  }
+
+  .m-nav-flame {
+    font-size: 15px;
+    line-height: 1;
+  }
+
+  @media (max-width: 860px) {
+    .app-nav-bar {
+      display: none;
+    }
+    .mobile-bottom-nav {
+      display: flex;
+    }
+    .app-main-content {
+      padding-bottom: 80px;
+    }
+  }
+
+  @media (max-width: 640px) {
+    .header-inner {
+      padding: 10px 14px;
+    }
+    .user-greeting {
+      display: none;
+    }
+    .new-btn-nav span {
+      display: none;
+    }
+    .app-main-content {
+      padding: 14px 12px 80px 12px;
+    }
+  }
+
+  /* Logout Confirmation Modal */
+  .logout-modal-card {
+    max-width: 360px;
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 16px;
+    padding: 28px 24px;
+  }
+
+  .logout-icon-circle {
+    width: 50px;
+    height: 50px;
+    border-radius: 50%;
+    background: var(--color-surface-subtle);
+    border: 1px solid var(--color-border);
+    color: var(--color-text);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .logout-modal-text {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .logout-modal-title {
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--color-text);
+  }
+
+  .logout-modal-desc {
+    font-size: 13px;
+    color: var(--color-muted);
+  }
+
+  .logout-modal-actions {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    width: 100%;
+    margin-top: 4px;
+  }
+
+  .logout-modal-actions .btn {
+    flex: 1;
+    padding: 9px 12px;
+  }
+
+  .btn-logout-confirm {
+    background: var(--color-text);
+    color: #FFFFFF;
+  }
+
+  .btn-logout-confirm:hover {
+    background: #000000;
+  }
+</style>
+
+<script>
+  const pickerTrigger = document.getElementById('btn-challenge-picker');
+  const dropdown = document.getElementById('challenge-dropdown');
+
+  if (pickerTrigger && dropdown) {
+    pickerTrigger.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const isShown = dropdown.style.display !== 'none';
+      dropdown.style.display = isShown ? 'none' : 'flex';
+    });
+
+    document.addEventListener('click', (e) => {
+      if (!dropdown.contains(e.target as Node) && e.target !== pickerTrigger) {
+        dropdown.style.display = 'none';
+      }
+    });
+  }
+
+  // Notifications Dropdown Handling
+  const notifToggle = document.getElementById('btn-notifications-toggle');
+  const notifDropdown = document.getElementById('notifications-dropdown');
+  const markAllReadBtn = document.getElementById('btn-mark-all-read');
+  const notifBadge = document.getElementById('notif-badge');
+
+  if (notifToggle && notifDropdown) {
+    notifToggle.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const isShown = notifDropdown.style.display !== 'none';
+      notifDropdown.style.display = isShown ? 'none' : 'flex';
+    });
+
+    document.addEventListener('click', (e) => {
+      if (!notifDropdown.contains(e.target as Node) && e.target !== notifToggle) {
+        notifDropdown.style.display = 'none';
+      }
+    });
+  }
+
+  if (markAllReadBtn) {
+    markAllReadBtn.addEventListener('click', async () => {
+      try {
+        await fetch('/api/notifications/mark-read', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({})
+        });
+        document.querySelectorAll('.notif-item.unread').forEach((el) => {
+          el.classList.remove('unread');
+          el.classList.add('read');
+        });
+        if (notifBadge) notifBadge.style.display = 'none';
+        markAllReadBtn.style.display = 'none';
+      } catch (err) {
+        console.error('Error marking notifications read:', err);
+      }
+    });
+  }
+
+  // Logout Confirmation Modal Handling
+  const logoutBtn = document.getElementById('btn-header-logout');
+  const logoutModal = document.getElementById('logout-confirm-modal');
+  const logoutCancel = document.getElementById('btn-logout-cancel');
+
+  if (logoutBtn && logoutModal) {
+    logoutBtn.addEventListener('click', () => {
+      logoutModal.classList.add('active');
+    });
+  }
+
+  if (logoutCancel && logoutModal) {
+    logoutCancel.addEventListener('click', () => {
+      logoutModal.classList.remove('active');
+    });
+  }
+
+  if (logoutModal) {
+    logoutModal.addEventListener('click', (e) => {
+      if (e.target === logoutModal) {
+        logoutModal.classList.remove('active');
+      }
+    });
+  }
+</script>

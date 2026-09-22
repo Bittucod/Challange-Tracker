@@ -1,0 +1,207 @@
+---
+import Layout from '../layouts/Layout.astro';
+---
+
+<Layout
+  title="Challenge & Staking Rules — StreakGrid"
+  description="Comprehensive documentation of how StreakGrid evaluates daily success, deadlines, streaks, and proof."
+>
+  <div class="legal-page-layout">
+    <header class="legal-header">
+      <div class="legal-header-inner">
+        <a href="/" class="brand-link">
+          <div class="brand-badge">✓</div>
+          <span class="brand-name">StreakGrid</span>
+        </a>
+        <a href="/" class="btn btn-secondary btn-sm">Return Home</a>
+      </div>
+    </header>
+
+    <main class="legal-content-container">
+      <div class="legal-doc-card">
+        <div class="doc-header">
+          <span class="doc-tag">Official Rules</span>
+          <h1 class="doc-title">Challenge & Accountability Rules</h1>
+          <span class="doc-date">Version 2.0 • Published September 2026</span>
+        </div>
+
+        <div class="doc-body">
+          <section class="doc-section">
+            <h2>1. The Daily Deadline</h2>
+            <p>
+              Every challenge tracks calendar days sequentially from Day 1 to the configured duration (30, 50, or 100 days).
+            </p>
+            <p>
+              Daily evaluation occurs according to the challenge's configured timezone (stored in UTC). A day closes precisely at <strong>23:59:59</strong>. Once a day has elapsed into the past, uncompleted pending cells are marked as missed.
+            </p>
+          </section>
+
+          <section class="doc-section">
+            <h2>2. What Counts as a Successful Day</h2>
+            <p>
+              During challenge creation, the user selects one of three immutable success rules:
+            </p>
+            <ul>
+              <li><strong>Complete all activities:</strong> All active tracker columns must be checked for the day to count as successful.</li>
+              <li><strong>Complete at least one activity:</strong> Checking any single activity completes the day and preserves the streak.</li>
+              <li><strong>Custom minimum count:</strong> A defined number of activities (e.g. at least 3 of 5) must be completed each day.</li>
+            </ul>
+            <p>
+              Exempt activities (marked with «—») are excluded from the required denominator for that day.
+            </p>
+          </section>
+
+          <section class="doc-section">
+            <h2>3. Streak Calculation & Grace Logic</h2>
+            <p>
+              Streaks represent consecutive successful calendar days:
+            </p>
+            <ul>
+              <li>If Today is completed, the streak includes Today and extends backward.</li>
+              <li>If Today is still in progress (pending), your current streak reflects consecutive successful days up through Yesterday.</li>
+              <li>A single missed past day resets the active streak counter to zero, but your total successful days and consistency percentage remain preserved.</li>
+            </ul>
+          </section>
+
+          <section class="doc-section">
+            <h2>4. What Happens on Success vs Failure</h2>
+            <ul>
+              <li>
+                <strong>Success:</strong> Achieving the target consistency rate unlocks permanent completion badges (e.g. <em>100 DAY SHIPPER</em>) and initiates immediate full refund of your refundable deposit.
+              </li>
+              <li>
+                <strong>Failure:</strong> If consistency targets are not met, the challenge concludes respectfully as incomplete, and the deposit is forfeited according to the locked terms.
+              </li>
+            </ul>
+          </section>
+
+          <section class="doc-section">
+            <h2>5. Proof of Work (Build in Public & Output Challenges)</h2>
+            <p>
+              For public challenges such as <em>100 Days Build in Public</em>, users are encouraged to attach a short completion summary and project URL (e.g., live product link, open source repository, or public documentation). Heavy file uploads are avoided to keep the platform fast and privacy-friendly.
+            </p>
+          </section>
+        </div>
+      </div>
+    </main>
+  </div>
+</Layout>
+
+<style>
+  .legal-page-layout {
+    min-height: 100vh;
+    background: var(--color-bg);
+    display: flex;
+    flex-direction: column;
+  }
+
+  .legal-header {
+    background: var(--color-surface);
+    border-bottom: 1px solid var(--color-border);
+    padding: 12px 20px;
+  }
+
+  .legal-header-inner {
+    max-width: 860px;
+    margin: 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .brand-link {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-weight: 700;
+    font-size: 16px;
+    color: var(--color-text);
+  }
+
+  .brand-badge {
+    width: 24px;
+    height: 24px;
+    background: var(--color-primary);
+    border-radius: 5px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #FFFFFF;
+    font-weight: 800;
+    font-size: 14px;
+  }
+
+  .legal-content-container {
+    max-width: 860px;
+    width: 100%;
+    margin: 30px auto 80px auto;
+    padding: 0 20px;
+  }
+
+  .legal-doc-card {
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-modal);
+    padding: 40px 36px;
+    box-shadow: var(--shadow-sm);
+    display: flex;
+    flex-direction: column;
+    gap: 28px;
+  }
+
+  .doc-header {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    border-bottom: 1px solid var(--color-border-subtle);
+    padding-bottom: 20px;
+  }
+
+  .doc-tag {
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--color-primary-hover);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+
+  .doc-title {
+    font-size: 28px;
+    font-weight: 800;
+    color: var(--color-text);
+    letter-spacing: -0.02em;
+  }
+
+  .doc-date {
+    font-size: 13px;
+    color: var(--color-muted);
+  }
+
+  .doc-body {
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+    line-height: 1.6;
+    font-size: 14px;
+    color: var(--color-text);
+  }
+
+  .doc-section {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .doc-section h2 {
+    font-size: 17px;
+    font-weight: 700;
+    color: var(--color-text);
+  }
+
+  .doc-section ul {
+    margin-left: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+</style>

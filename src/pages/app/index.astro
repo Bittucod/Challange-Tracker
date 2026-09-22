@@ -1,0 +1,141 @@
+---
+import AppLayout from '../../layouts/AppLayout.astro';
+import Icons from '../../components/Icons.astro';
+import { getUserFromCookies } from '../../lib/auth';
+import { db } from '../../lib/db';
+import type { Challenge } from '../../lib/types';
+
+const user = getUserFromCookies(Astro.cookies);
+if (!user) {
+  return Astro.redirect('/login');
+}
+
+const challenges = db
+  .prepare('SELECT * FROM challenges WHERE user_id = ? AND is_archived = 0 ORDER BY updated_at DESC')
+  .all(user.id) as Challenge[];
+
+// If user already has an active challenge, redirect directly to it
+if (challenges.length > 0) {
+  return Astro.redirect(`/app/challenges/${challenges[0].id}`);
+}
+---
+
+<AppLayout title="Challenges — StreakGrid">
+  <div class="empty-dashboard-container">
+    <div class="empty-state-card">
+      <div class="empty-icon-circle">
+        <Icons name="target" size={32} />
+      </div>
+
+      <h1 class="empty-title">Your first challenge starts here.</h1>
+      <p class="empty-sub">
+        Set up a 30, 50, or 100-day challenge with custom activities. Track day-by-day with daily boxes, unbroken streaks, and zero distractions.
+      </p>
+
+      <div class="empty-cta-group">
+        <a href="/app/challenges/new" class="btn btn-primary btn-lg">
+          <Icons name="plus" size={16} />
+          <span>Create Challenge</span>
+        </a>
+      </div>
+
+      <div class="empty-ideas">
+        <span class="ideas-label">Popular challenge ideas:</span>
+        <div class="ideas-pills">
+          <span class="idea-pill">100 Days Build in Public</span>
+          <span class="idea-pill">50 Days of Code</span>
+          <span class="idea-pill">30 Days Fitness</span>
+          <span class="idea-pill">100 Days Content</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</AppLayout>
+
+<style>
+  .empty-dashboard-container {
+    max-width: 600px;
+    margin: 80px auto;
+    text-align: center;
+  }
+
+  .empty-state-card {
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-modal);
+    box-shadow: var(--shadow-md);
+    padding: 48px 32px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 16px;
+  }
+
+  .empty-icon-circle {
+    width: 68px;
+    height: 68px;
+    border-radius: 50%;
+    background: var(--color-primary-light);
+    color: var(--color-primary-hover);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 8px;
+  }
+
+  .empty-title {
+    font-size: 24px;
+    font-weight: 700;
+    color: var(--color-text);
+    letter-spacing: -0.02em;
+  }
+
+  .empty-sub {
+    font-size: 14px;
+    color: var(--color-text-secondary);
+    line-height: 1.5;
+    max-width: 440px;
+  }
+
+  .empty-cta-group {
+    margin-top: 8px;
+  }
+
+  .btn-lg {
+    padding: 11px 22px;
+    font-size: 15px;
+    font-weight: 600;
+  }
+
+  .empty-ideas {
+    margin-top: 24px;
+    padding-top: 20px;
+    border-top: 1px solid var(--color-border-subtle);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .ideas-label {
+    font-size: 12px;
+    color: var(--color-muted);
+    font-weight: 500;
+  }
+
+  .ideas-pills {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    justify-content: center;
+  }
+
+  .idea-pill {
+    font-size: 12px;
+    padding: 4px 10px;
+    border-radius: var(--radius-sm);
+    background: var(--color-surface-subtle);
+    border: 1px solid var(--color-border);
+    color: var(--color-text-secondary);
+  }
+</style>

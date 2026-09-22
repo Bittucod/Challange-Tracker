@@ -1,0 +1,191 @@
+---
+import Layout from '../../layouts/Layout.astro';
+import Icons from '../../components/Icons.astro';
+import { db } from '../../lib/db';
+import type { Invite, User } from '../../lib/types';
+
+const { code } = Astro.params;
+
+let inviterName = 'A friend';
+if (code) {
+  const invite = db.prepare('SELECT * FROM invites WHERE code = ?').get(code) as Invite | undefined;
+  if (invite) {
+    const inviter = db.prepare('SELECT name FROM users WHERE id = ?').get(invite.inviter_id) as User | undefined;
+    if (inviter) {
+      inviterName = inviter.name;
+    }
+  }
+}
+---
+
+<Layout
+  title={`${inviterName} invited you to StreakGrid`}
+  description="Accept your invite to join StreakGrid, the minimal challenge OS. Track your 30, 50, or 100-day challenge with daily spreadsheet simplicity."
+>
+  <div class="invite-page-viewport">
+    <div class="invite-card">
+      <div class="invite-header">
+        <a href="/" class="brand-link">
+          <div class="brand-badge">✓</div>
+          <span>StreakGrid</span>
+        </a>
+
+        <div class="invite-avatar-pill">
+          <span>🎁 Special Invitation</span>
+        </div>
+
+        <h1 class="invite-heading">{inviterName} invited you to build alongside them.</h1>
+        <p class="invite-sub">
+          «I'm putting real commitment behind my challenge. Join me and build alongside me on StreakGrid.»
+        </p>
+      </div>
+
+      <div class="invite-features-box">
+        <div class="invite-feature-item">
+          <Icons name="target" size={16} />
+          <span>Daily spreadsheet tracking grid (the hero experience)</span>
+        </div>
+        <div class="invite-feature-item">
+          <Icons name="flame" size={16} />
+          <span>Automated streaks with custom success rules</span>
+        </div>
+        <div class="invite-feature-item">
+          <Icons name="check" size={16} />
+          <span>Real-stakes accountability: put a stake behind your goal & get it refunded on completion</span>
+        </div>
+        <div class="invite-feature-item">
+          <Icons name="share" size={16} />
+          <span>Community accountability feed & screenshot-worthy progress cards</span>
+        </div>
+      </div>
+
+      <div class="invite-cta-area">
+        <a href={`/signup?ref=${code}`} class="btn btn-primary invite-btn">
+          <span>Accept Invite & Start Challenge</span>
+          <Icons name="arrow-right" size={16} />
+        </a>
+      </div>
+
+      <div class="invite-philosophy">
+        «Put something meaningful on the line. Show up. Complete your challenge. Get your stake back.»
+      </div>
+    </div>
+  </div>
+</Layout>
+
+<style>
+  .invite-page-viewport {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    background: var(--color-bg);
+  }
+
+  .invite-card {
+    max-width: 520px;
+    width: 100%;
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-modal);
+    box-shadow: var(--shadow-lg);
+    padding: 40px 32px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    gap: 24px;
+  }
+
+  .invite-header {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .brand-link {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-weight: 700;
+    font-size: 15px;
+    color: var(--color-text);
+  }
+
+  .brand-badge {
+    width: 24px;
+    height: 24px;
+    background: var(--color-primary);
+    border-radius: 5px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #FFFFFF;
+    font-weight: 800;
+    font-size: 14px;
+  }
+
+  .invite-avatar-pill {
+    padding: 3px 10px;
+    border-radius: 20px;
+    background: var(--color-primary-light);
+    color: var(--color-primary-hover);
+    font-size: 12px;
+    font-weight: 600;
+  }
+
+  .invite-heading {
+    font-size: 26px;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    color: var(--color-text);
+    line-height: 1.25;
+  }
+
+  .invite-sub {
+    font-size: 14px;
+    color: var(--color-text-secondary);
+    line-height: 1.5;
+    font-style: italic;
+  }
+
+  .invite-features-box {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    width: 100%;
+    text-align: left;
+    background: var(--color-surface-subtle);
+    border: 1px solid var(--color-border-subtle);
+    border-radius: var(--radius-panel);
+    padding: 16px;
+  }
+
+  .invite-feature-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 13px;
+    color: var(--color-text);
+    font-weight: 500;
+  }
+
+  .invite-cta-area {
+    width: 100%;
+  }
+
+  .invite-btn {
+    width: 100%;
+    padding: 12px;
+    font-size: 15px;
+    font-weight: 600;
+  }
+
+  .invite-philosophy {
+    font-size: 12px;
+    color: var(--color-muted);
+    font-style: italic;
+  }
+</style>

@@ -1,0 +1,195 @@
+---
+import AppLayout from '../../layouts/AppLayout.astro';
+import Icons from '../../components/Icons.astro';
+import { getUserFromCookies } from '../../lib/auth';
+import { db } from '../../lib/db';
+import type { Invite } from '../../lib/types';
+
+const user = getUserFromCookies(Astro.cookies);
+if (!user) {
+  return Astro.redirect('/login');
+}
+
+const invite = db
+  .prepare('SELECT * FROM invites WHERE inviter_id = ? ORDER BY created_at DESC')
+  .get(user.id) as Invite | undefined;
+
+const inviteCode = invite ? invite.code : 'STREAK';
+const inviteUrl = `${Astro.url.origin}/invite/${inviteCode}`;
+---
+
+<AppLayout title="Account Settings — StreakGrid">
+  <div class="account-settings-container">
+    <div class="settings-card">
+      <h1 class="card-title">Account Profile</h1>
+      <p class="card-sub">Your personal credentials and invite link.</p>
+
+      <div class="profile-info-grid">
+        <div class="info-item">
+          <span class="info-label">Full Name</span>
+          <span class="info-val">{user.name}</span>
+        </div>
+
+        <div class="info-item">
+          <span class="info-label">Email Address</span>
+          <span class="info-val">{user.email}</span>
+        </div>
+
+        <div class="info-item">
+          <span class="info-label">Member Since</span>
+          <span class="info-val">{new Date(user.created_at).toLocaleDateString()}</span>
+        </div>
+      </div>
+
+      <div class="card-divider"></div>
+
+      <!-- Invite Referral Section -->
+      <div class="invite-referral-block">
+        <div class="invite-block-header">
+          <h3 class="section-title">Your Personal Invite Link</h3>
+          <p class="section-desc">Share with co-founders, teammates, or accountability partners.</p>
+        </div>
+
+        <div class="invite-link-row">
+          <input
+            type="text"
+            id="account-invite-link"
+            class="form-input"
+            readonly
+            value={inviteUrl}
+          />
+          <button type="button" id="btn-copy-account-link" class="btn btn-primary">
+            <Icons name="copy" size={15} />
+            <span id="copy-status-text">Copy Link</span>
+          </button>
+        </div>
+
+        <div class="invite-stats-pill">
+          <span>🎁 Friends joined via your link: <strong>{invite ? invite.uses_count : 0}</strong></span>
+        </div>
+      </div>
+
+      <div class="card-divider"></div>
+
+      <div class="logout-action-area">
+        <a href="/api/auth/logout" class="btn btn-outline">
+          <span>Sign Out</span>
+        </a>
+      </div>
+    </div>
+  </div>
+</AppLayout>
+
+<style>
+  .account-settings-container {
+    max-width: 600px;
+    margin: 20px auto;
+  }
+
+  .settings-card {
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-modal);
+    padding: 32px 28px;
+    box-shadow: var(--shadow-sm);
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+  }
+
+  .card-title {
+    font-size: 22px;
+    font-weight: 700;
+    color: var(--color-text);
+  }
+
+  .card-sub {
+    font-size: 13px;
+    color: var(--color-muted);
+  }
+
+  .profile-info-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    background: var(--color-surface-subtle);
+    padding: 16px;
+    border-radius: var(--radius-panel);
+    border: 1px solid var(--color-border-subtle);
+  }
+
+  .info-item {
+    display: flex;
+    justify-content: space-between;
+    font-size: 13px;
+  }
+
+  .info-label {
+    color: var(--color-muted);
+    font-weight: 500;
+  }
+
+  .info-val {
+    color: var(--color-text);
+    font-weight: 600;
+  }
+
+  .card-divider {
+    height: 1px;
+    background: var(--color-border-subtle);
+  }
+
+  .invite-referral-block {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .section-title {
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--color-text);
+  }
+
+  .section-desc {
+    font-size: 12px;
+    color: var(--color-muted);
+  }
+
+  .invite-link-row {
+    display: flex;
+    gap: 8px;
+  }
+
+  .invite-stats-pill {
+    font-size: 12px;
+    color: var(--color-text-secondary);
+  }
+
+  .logout-action-area {
+    display: flex;
+    justify-content: flex-start;
+  }
+</style>
+
+<script>
+  const copyBtn = document.getElementById('btn-copy-account-link');
+  const copyText = document.getElementById('copy-status-text');
+  const linkInput = document.getElementById('account-invite-link') as HTMLInputElement;
+
+  if (copyBtn && linkInput && copyText) {
+    copyBtn.addEventListener('click', async () => {
+      try {
+        await navigator.clipboard.writeText(linkInput.value);
+        copyText.textContent = 'Copied!';
+        setTimeout(() => {
+          copyText.textContent = 'Copy Link';
+        }, 2000);
+      } catch {
+        linkInput.select();
+        document.execCommand('copy');
+        copyText.textContent = 'Copied!';
+      }
+    });
+  }
+</script>

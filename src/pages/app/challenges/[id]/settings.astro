@@ -1,0 +1,801 @@
+---
+import AppLayout from '../../../../layouts/AppLayout.astro';
+import StreakBanner from '../../../../components/StreakBanner.astro';
+import Icons from '../../../../components/Icons.astro';
+import { getUserFromCookies } from '../../../../lib/auth';
+import { db } from '../../../../lib/db';
+import { calculateChallengeAnalytics } from '../../../../lib/engine';
+import { isChallengeLocked, getChallengeStakeCommitment } from '../../../../lib/stakes';
+import { ALL_ICONS } from '../../../../lib/icons';
+import type { Challenge, Activity, DailyRecord, Milestone } from '../../../../lib/types';
+
+const user = getUserFromCookies(Astro.cookies);
+if (!user) {
+  return Astro.redirect('/login');
+}
+
+const { id } = Astro.params;
+if (!id) {
+  return Astro.redirect('/app');
+}
+
+const challenge = db
+  .prepare('SELECT * FROM challenges WHERE id = ? AND user_id = ?')
+  .get(id, user.id) as Challenge | undefined;
+
+if (!challenge) {
+  return Astro.redirect('/app');
+}
+
+const activities = db
+  .prepare('SELECT * FROM activities WHERE challenge_id = ? ORDER BY sort_order ASC')
+  .all(id) as Activity[];
+
+const records = db
+  .prepare('SELECT * FROM daily_records WHERE challenge_id = ?')
+  .all(id) as DailyRecord[];
+
+const milestones = db
+  .prepare('SELECT * FROM milestones WHERE challenge_id = ? ORDER BY target_days ASC')
+  .all(id) as Milestone[];
+
+const analytics = calculateChallengeAnalytics(challenge, activities, records);
+const isLocked = isChallengeLocked(challenge.id);
+const commitment = getChallengeStakeCommitment(challenge.id);
+---
+
+<AppLayout title={`${challenge.name} Settings — StreakGrid`} activeChallengeId={challenge.id}>
+  <div class="settings-page-view" data-challenge-id={challenge.id}>
+    <StreakBanner
+      challenge={challenge}
+      analytics={analytics}
+      activeTab="settings"
+    />
+
+    <div class="settings-card-container">
+      {isLocked && (
+        <div class="lock-notice-banner">
+          <div class="lock-icon">🔒</div>
+          <div class="lock-text">
+            <strong>Commitment Locked</strong>
+            <p>
+              This challenge has an active stake commitment. Duration and daily success criteria are locked to protect the integrity of your commitment.
+            </p>
+          </div>
+        </div>
+      )}
+
+      <!-- General Settings -->
+      <div class="settings-card">
+        <h2 class="card-title">Challenge Details</h2>
+        <p class="card-sub">Update challenge name, description, and visibility.</p>
+
+        <div id="general-alert" class="alert-box" style="display: none;"></div>
+
+        <form id="challenge-details-form" class="settings-form">
+          <div class="form-group">
+            <label for="name" class="form-label">Challenge Name</label>
+            <input
+              type="text"
+              id="name"
+              name="name"
+              class="form-input"
+              value={challenge.name}
+              required
+            />
+          </div>
+
+          <div class="form-group">
+            <label for="description" class="form-label">Description</label>
+            <input
+              type="text"
+              id="description"
+              name="description"
+              class="form-input"
+              value={challenge.description || ''}
+            />
+          </div>
+
+          <!-- Visibility & Privacy -->
+          <div class="form-group">
+            <label class="form-label">Visibility & Social Sharing</label>
+            <div class="visibility-options-grid">
+              <label class="vis-card">
+                <input type="radio" name="visibility" value="private" checked={!challenge.visibility || challenge.visibility === 'private'} />
+                <div class="vis-info">
+                  <strong>Private</strong>
+                  <span>Only visible to you</span>
+                </div>
+              </label>
+
+              <label class="vis-card">
+                <input type="radio" name="visibility" value="community" checked={challenge.visibility === 'community'} />
+                <div class="vis-info">
+                  <strong>Community</strong>
+                  <span>Visible to community feed</span>
+                </div>
+              </label>
+
+              <label class="vis-card">
+                <input type="radio" name="visibility" value="public" checked={challenge.visibility === 'public'} />
+                <div class="vis-info">
+                  <strong>Public</strong>
+                  <span>Anyone with link can view</span>
+                </div>
+              </label>
+            </div>
+          </div>
+
+          <div class="privacy-toggles-box">
+            <label class="toggle-row">
+              <input type="checkbox" id="show_stake_amount" name="show_stake_amount" checked={challenge.show_stake_amount !== 0} />
+              <span>Show stake commitment amount on public accountability card</span>
+            </label>
+
+            <label class="toggle-row">
+              <input type="checkbox" id="allow_comments" name="allow_comments" checked={challenge.allow_comments !== 0} />
+              <span>Allow encouragement comments on public challenge</span>
+            </label>
+          </div>
+
+          <!-- Success Criteria Rule -->
+          <div class="form-group">
+            <label class="form-label">
+              Success Criteria Rule {isLocked && <span class="locked-badge">LOCKED</span>}
+            </label>
+            <div class={`rule-options ${isLocked ? 'options-disabled' : ''}`}>
+              <label class="rule-option">
+                <input type="radio" name="success_rule" value="all" checked={challenge.success_rule === 'all'} disabled={isLocked} />
+                <div class="rule-text">
+                  <span class="rule-title">Complete all activities</span>
+                  <span class="rule-desc">All active activities must be checked</span>
+                </div>
+              </label>
+
+              <label class="rule-option">
+                <input type="radio" name="success_rule" value="at_least_one" checked={challenge.success_rule === 'at_least_one'} disabled={isLocked} />
+                <div class="rule-text">
+                  <span class="rule-title">Complete at least one activity</span>
+                  <span class="rule-desc">Any single activity completes the day</span>
+                </div>
+              </label>
+
+              <label class="rule-option">
+                <input type="radio" name="success_rule" value="custom_min" checked={challenge.success_rule === 'custom_min'} disabled={isLocked} />
+                <div class="rule-text">
+                  <span class="rule-title">Custom minimum count</span>
+                  <span class="rule-desc">Complete at least X activities</span>
+                </div>
+                <input
+                  type="number"
+                  id="success_min_count"
+                  name="success_min_count"
+                  class="form-input min-count-input"
+                  min="1"
+                  max="10"
+                  value={challenge.success_min_count}
+                  disabled={isLocked}
+                />
+              </label>
+            </div>
+          </div>
+
+          <div class="form-actions">
+            <button type="submit" id="btn-save-details" class="btn btn-primary btn-sm">
+              Save Changes
+            </button>
+          </div>
+        </form>
+      </div>
+
+      <!-- Proof of Completion Card -->
+      <div class="settings-card">
+        <h2 class="card-title">Proof of Completion</h2>
+        <p class="card-sub">
+          Share optional evidence of what you shipped (live project URL, GitHub repo, or completion note).
+        </p>
+
+        <form id="proof-form" class="settings-form">
+          <div class="form-group">
+            <label for="proof_url" class="form-label">Project / Launch URL</label>
+            <input
+              type="url"
+              id="proof_url"
+              name="proof_url"
+              class="form-input"
+              value={challenge.proof_url || ''}
+              placeholder="https://example.com or https://github.com/..."
+            />
+          </div>
+
+          <div class="form-group">
+            <label for="proof_note" class="form-label">Completion Summary Note</label>
+            <textarea
+              id="proof_note"
+              name="proof_note"
+              class="form-input proof-textarea"
+              rows="3"
+              placeholder="What did you build and complete during this challenge?"
+            >{challenge.proof_note || ''}</textarea>
+          </div>
+
+          <div class="form-actions">
+            <button type="button" id="btn-save-proof" class="btn btn-secondary btn-sm">
+              Update Proof
+            </button>
+          </div>
+        </form>
+      </div>
+
+      <!-- Manage Activities -->
+      <div class="settings-card">
+        <h2 class="card-title">Manage Activities</h2>
+        <p class="card-sub">
+          Add or customize tracker activities. {isLocked && 'Existing activities cannot be removed while stake is active.'}
+        </p>
+
+        <div id="act-alert" class="alert-box" style="display: none;"></div>
+
+        <div class="activities-manager-list" id="activities-manage-list">
+          {activities.map((act) => (
+            <div class="act-manage-row" data-activity-id={act.id}>
+              <div class="act-row-left">
+                <span class="drag-handle">⠿</span>
+                <span class="act-icon-preview">
+                  <Icons name={act.icon} size={16} />
+                </span>
+                <span class="act-name-display">{act.name}</span>
+              </div>
+
+              <div class="act-row-right">
+                {!isLocked && (
+                  <button
+                    type="button"
+                    class="btn-icon delete-activity-btn"
+                    data-activity-id={act.id}
+                    title="Delete activity"
+                  >
+                    <Icons name="close" size={14} />
+                  </button>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <!-- Add New Activity Subform -->
+        <div class="add-activity-inline">
+          <input
+            type="text"
+            id="new-act-name"
+            class="form-input"
+            placeholder="New activity name (e.g. Substack, Pushups)"
+          />
+          <select id="new-act-icon" class="form-input icon-select">
+            {ALL_ICONS.map((icon) => (
+              <option value={icon.value}>{icon.label}</option>
+            ))}
+          </select>
+          <button type="button" id="btn-add-new-act" class="btn btn-secondary btn-sm">
+            <Icons name="plus" size={14} />
+            <span>Add</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Danger Zone -->
+      <div class="settings-card danger-zone">
+        <h2 class="card-title danger-text">Danger Zone</h2>
+        <p class="card-sub">Permanently delete this challenge and all of its daily tracking records.</p>
+
+        <div class="danger-action-row">
+          <div class="danger-info">
+            <span class="danger-item-name">Delete Challenge</span>
+            <span class="danger-item-desc">
+              {isLocked
+                ? 'Locked: Active stake challenges cannot be deleted while under commitment.'
+                : 'Once deleted, your tracking history cannot be recovered.'}
+            </span>
+          </div>
+          <button
+            type="button"
+            id="btn-delete-challenge"
+            class="btn btn-outline danger-btn"
+            disabled={isLocked}
+            title={isLocked ? 'Cannot delete active stake challenge' : 'Delete challenge'}
+          >
+            Delete Challenge
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+</AppLayout>
+
+<style>
+  .settings-page-view {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+  }
+
+  .settings-card-container {
+    max-width: 680px;
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+  }
+
+  .lock-notice-banner {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    background: #FEF3C7;
+    border: 1px solid rgba(245, 158, 11, 0.4);
+    border-radius: var(--radius-panel);
+    padding: 14px 18px;
+    color: #92400E;
+  }
+
+  .lock-icon {
+    font-size: 20px;
+  }
+
+  .lock-text strong {
+    display: block;
+    font-size: 14px;
+    margin-bottom: 2px;
+  }
+
+  .lock-text p {
+    font-size: 12px;
+    color: #92400E;
+    line-height: 1.4;
+  }
+
+  .settings-card {
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-panel);
+    padding: 24px;
+    box-shadow: var(--shadow-sm);
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .card-title {
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--color-text);
+  }
+
+  .card-sub {
+    font-size: 13px;
+    color: var(--color-muted);
+  }
+
+  .settings-form {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .form-group {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .locked-badge {
+    font-size: 10px;
+    padding: 2px 6px;
+    border-radius: 4px;
+    background: #FEF3C7;
+    color: #B45309;
+    font-weight: 700;
+    margin-left: 6px;
+  }
+
+  .options-disabled {
+    opacity: 0.65;
+  }
+
+  .visibility-options-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+  }
+
+  .vis-card {
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    padding: 8px 10px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+  }
+
+  .vis-card input {
+    accent-color: var(--color-primary);
+  }
+
+  .vis-info {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .vis-info strong {
+    font-size: 13px;
+    color: var(--color-text);
+  }
+
+  .vis-info span {
+    font-size: 11px;
+    color: var(--color-muted);
+  }
+
+  .privacy-toggles-box {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 10px 12px;
+    background: var(--color-surface-subtle);
+    border-radius: var(--radius-sm);
+  }
+
+  .toggle-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 12px;
+    color: var(--color-text);
+    cursor: pointer;
+  }
+
+  .toggle-row input {
+    accent-color: var(--color-primary);
+  }
+
+  .proof-textarea {
+    resize: vertical;
+  }
+
+  .rule-options {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .rule-option {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 10px 12px;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    background: var(--color-surface);
+    cursor: pointer;
+  }
+
+  .rule-text {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .rule-title {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--color-text);
+  }
+
+  .rule-desc {
+    font-size: 12px;
+    color: var(--color-muted);
+  }
+
+  .min-count-input {
+    width: 60px;
+    padding: 4px 6px;
+    margin-left: 8px;
+  }
+
+  .form-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+  }
+
+  .activities-manager-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .act-manage-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 12px;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    background: var(--color-surface);
+  }
+
+  .act-row-left {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .drag-handle {
+    color: var(--color-muted);
+    cursor: grab;
+  }
+
+  .act-name-display {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--color-text);
+  }
+
+  .add-activity-inline {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 6px;
+  }
+
+  .icon-select {
+    width: 140px;
+  }
+
+  /* Danger Zone */
+  .danger-zone {
+    border-color: rgba(239, 106, 106, 0.3);
+  }
+
+  .danger-text {
+    color: var(--color-missed);
+  }
+
+  .danger-action-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+  }
+
+  .danger-item-name {
+    display: block;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--color-text);
+  }
+
+  .danger-item-desc {
+    font-size: 12px;
+    color: var(--color-muted);
+  }
+
+  .danger-btn {
+    color: var(--color-missed);
+    border-color: rgba(239, 106, 106, 0.4);
+  }
+
+  .danger-btn:hover:not(:disabled) {
+    background: var(--color-missed-soft);
+  }
+
+  .danger-btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
+
+  .alert-box {
+    padding: 9px 12px;
+    border-radius: var(--radius-sm);
+    font-size: 13px;
+  }
+
+  .alert-box.success {
+    background: var(--color-primary-light);
+    color: var(--color-primary-hover);
+    border: 1px solid rgba(34, 197, 94, 0.3);
+  }
+
+  .alert-box.error {
+    background: #FEE2E2;
+    color: #B91C1C;
+    border: 1px solid #FCA5A5;
+  }
+
+  @media (max-width: 640px) {
+    .visibility-options-grid {
+      grid-template-columns: 1fr;
+    }
+    .danger-action-row {
+      flex-direction: column;
+      align-items: flex-start;
+    }
+  }
+</style>
+
+<script>
+  const pageView = document.querySelector('.settings-page-view') as HTMLElement;
+  const challengeId = pageView?.dataset.challengeId;
+
+  const detailsForm = document.getElementById('challenge-details-form') as HTMLFormElement;
+  const generalAlert = document.getElementById('general-alert');
+  const actAlert = document.getElementById('act-alert');
+  const btnSaveDetails = document.getElementById('btn-save-details');
+  const btnSaveProof = document.getElementById('btn-save-proof');
+  const btnDelete = document.getElementById('btn-delete-challenge');
+  const btnAddAct = document.getElementById('btn-add-new-act');
+
+  function showAlert(box: HTMLElement | null, text: string, isError: boolean = false) {
+    if (!box) return;
+    box.textContent = text;
+    box.className = `alert-box ${isError ? 'error' : 'success'}`;
+    box.style.display = 'block';
+    setTimeout(() => {
+      box.style.display = 'none';
+    }, 4000);
+  }
+
+  // Save Challenge Details & Visibility
+  if (detailsForm && challengeId) {
+    detailsForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const name = (document.getElementById('name') as HTMLInputElement).value;
+      const description = (document.getElementById('description') as HTMLInputElement).value;
+      const show_stake_amount = (document.getElementById('show_stake_amount') as HTMLInputElement).checked ? 1 : 0;
+      const allow_comments = (document.getElementById('allow_comments') as HTMLInputElement).checked ? 1 : 0;
+
+      let visibility = 'private';
+      document.querySelectorAll('input[name="visibility"]').forEach((r) => {
+        if ((r as HTMLInputElement).checked) {
+          visibility = (r as HTMLInputElement).value;
+        }
+      });
+
+      let success_rule = 'all';
+      document.querySelectorAll('input[name="success_rule"]').forEach((r) => {
+        if ((r as HTMLInputElement).checked) {
+          success_rule = (r as HTMLInputElement).value;
+        }
+      });
+      const success_min_count = parseInt((document.getElementById('success_min_count') as HTMLInputElement).value, 10) || 1;
+
+      try {
+        const res = await fetch(`/api/challenges/${challengeId}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            name,
+            description,
+            visibility,
+            show_stake_amount,
+            allow_comments,
+            success_rule,
+            success_min_count
+          })
+        });
+
+        const data = await res.json();
+        if (res.ok) {
+          showAlert(generalAlert, 'Settings updated successfully!');
+        } else {
+          showAlert(generalAlert, data.error || 'Failed to update settings', true);
+        }
+      } catch {
+        showAlert(generalAlert, 'Network error. Try again.', true);
+      }
+    });
+  }
+
+  // Save Proof of Completion
+  if (btnSaveProof && challengeId) {
+    btnSaveProof.addEventListener('click', async () => {
+      const proof_url = (document.getElementById('proof_url') as HTMLInputElement).value;
+      const proof_note = (document.getElementById('proof_note') as HTMLTextAreaElement).value;
+
+      try {
+        const res = await fetch(`/api/challenges/${challengeId}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ proof_url, proof_note })
+        });
+
+        const data = await res.json();
+        if (res.ok) {
+          showAlert(generalAlert, 'Proof of completion updated!');
+        } else {
+          showAlert(generalAlert, data.error || 'Failed to save proof', true);
+        }
+      } catch {
+        showAlert(generalAlert, 'Network error. Try again.', true);
+      }
+    });
+  }
+
+  // Add Activity
+  if (btnAddAct && challengeId) {
+    btnAddAct.addEventListener('click', async () => {
+      const nameInp = document.getElementById('new-act-name') as HTMLInputElement;
+      const iconSel = document.getElementById('new-act-icon') as HTMLSelectElement;
+      const name = nameInp.value.trim();
+      const icon = iconSel.value;
+
+      if (!name) return;
+
+      try {
+        const res = await fetch(`/api/challenges/${challengeId}/activities`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name, icon })
+        });
+
+        if (res.ok) {
+          window.location.reload();
+        } else {
+          const d = await res.json();
+          showAlert(actAlert, d.error || 'Failed to add activity', true);
+        }
+      } catch {
+        showAlert(actAlert, 'Network error', true);
+      }
+    });
+  }
+
+  // Delete Activity
+  document.querySelectorAll('.delete-activity-btn').forEach((btn) => {
+    btn.addEventListener('click', async () => {
+      const actId = (btn as HTMLElement).dataset.activityId;
+      if (!actId || !challengeId) return;
+
+      if (!confirm('Are you sure you want to delete this activity?')) return;
+
+      try {
+        const res = await fetch(`/api/challenges/${challengeId}/activities?activityId=${actId}`, {
+          method: 'DELETE'
+        });
+
+        if (res.ok) {
+          window.location.reload();
+        } else {
+          const d = await res.json();
+          showAlert(actAlert, d.error || 'Failed to delete activity', true);
+        }
+      } catch {
+        showAlert(actAlert, 'Network error', true);
+      }
+    });
+  });
+
+  // Delete Challenge
+  if (btnDelete && challengeId) {
+    btnDelete.addEventListener('click', async () => {
+      if (btnDelete.hasAttribute('disabled')) return;
+      if (!confirm('Permanently delete this challenge and all tracking history? This cannot be undone.')) {
+        return;
+      }
+
+      try {
+        const res = await fetch(`/api/challenges/${challengeId}`, {
+          method: 'DELETE'
+        });
+
+        if (res.ok) {
+          window.location.href = '/app';
+        } else {
+          const d = await res.json();
+          showAlert(generalAlert, d.error || 'Failed to delete challenge', true);
+        }
+      } catch {
+        showAlert(generalAlert, 'Network error', true);
+      }
+    });
+  }
+</script>

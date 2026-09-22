@@ -1,0 +1,256 @@
+---
+import Layout from '../layouts/Layout.astro';
+import { getUserFromCookies } from '../lib/auth';
+
+const user = getUserFromCookies(Astro.cookies);
+if (user) {
+  return Astro.redirect('/app');
+}
+
+const inviteCode = Astro.url.searchParams.get('ref') || Astro.url.searchParams.get('invite') || '';
+---
+
+<Layout title="Create Account — StreakGrid">
+  <div class="auth-viewport">
+    <div class="auth-card">
+      <div class="auth-header">
+        <a href="/" class="auth-brand">
+          <div class="brand-badge">✓</div>
+          <span class="brand-title">StreakGrid</span>
+        </a>
+        <h1 class="auth-title">Create your account</h1>
+        <p class="auth-sub">Start tracking your 30, 50, or 100-day challenges.</p>
+
+        {inviteCode && (
+          <div class="invite-banner">
+            <span>🎁 You were invited via code <strong>{inviteCode}</strong></span>
+          </div>
+        )}
+      </div>
+
+      <div id="error-alert" class="error-box" style="display: none;"></div>
+
+      <form id="signup-form" class="auth-form" data-invite={inviteCode}>
+        <div class="form-group">
+          <label for="name" class="form-label">Full Name</label>
+          <input
+            type="text"
+            id="name"
+            name="name"
+            class="form-input"
+            required
+            autocomplete="name"
+            placeholder="Nitesh Kumar"
+          />
+        </div>
+
+        <div class="form-group">
+          <label for="email" class="form-label">Email Address</label>
+          <input
+            type="email"
+            id="email"
+            name="email"
+            class="form-input"
+            required
+            autocomplete="email"
+            placeholder="you@example.com"
+          />
+        </div>
+
+        <div class="form-group">
+          <label for="password" class="form-label">Password</label>
+          <input
+            type="password"
+            id="password"
+            name="password"
+            class="form-input"
+            required
+            minlength="6"
+            autocomplete="new-password"
+            placeholder="At least 6 characters"
+          />
+        </div>
+
+        <button type="submit" id="submit-btn" class="btn btn-primary btn-submit">
+          Start Your Challenge
+        </button>
+      </form>
+
+      <div class="auth-footer">
+        <span>Already have an account?</span>
+        <a href="/login" class="auth-link">Sign in</a>
+      </div>
+    </div>
+  </div>
+</Layout>
+
+<style>
+  .auth-viewport {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    background: var(--color-bg);
+  }
+
+  .auth-card {
+    width: 100%;
+    max-width: 420px;
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-modal);
+    box-shadow: var(--shadow-md);
+    padding: 32px 28px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+  }
+
+  .auth-header {
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .auth-brand {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-weight: 700;
+    font-size: 15px;
+    margin-bottom: 8px;
+  }
+
+  .brand-badge {
+    width: 24px;
+    height: 24px;
+    background: var(--color-primary);
+    border-radius: 5px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #FFFFFF;
+    font-weight: 800;
+    font-size: 14px;
+  }
+
+  .auth-title {
+    font-size: 22px;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    color: var(--color-text);
+  }
+
+  .auth-sub {
+    font-size: 13px;
+    color: var(--color-muted);
+  }
+
+  .invite-banner {
+    margin-top: 8px;
+    padding: 6px 12px;
+    background: var(--color-primary-light);
+    border: 1px solid rgba(34, 197, 94, 0.25);
+    border-radius: var(--radius-sm);
+    font-size: 12px;
+    color: var(--color-primary-hover);
+  }
+
+  .error-box {
+    background: var(--color-missed-soft);
+    border: 1px solid rgba(239, 106, 106, 0.3);
+    color: var(--color-missed);
+    padding: 8px 12px;
+    border-radius: var(--radius-sm);
+    font-size: 13px;
+  }
+
+  .auth-form {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .form-group {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .btn-submit {
+    width: 100%;
+    padding: 10px;
+    font-size: 14px;
+    margin-top: 4px;
+  }
+
+  .auth-footer {
+    text-align: center;
+    font-size: 13px;
+    color: var(--color-text-secondary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 5px;
+  }
+
+  .auth-link {
+    color: var(--color-primary-hover);
+    font-weight: 600;
+  }
+</style>
+
+<script>
+  const form = document.getElementById('signup-form') as HTMLFormElement;
+  const errorBox = document.getElementById('error-alert');
+  const submitBtn = document.getElementById('submit-btn');
+
+  if (form) {
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      if (errorBox) errorBox.style.display = 'none';
+      if (submitBtn) {
+        submitBtn.setAttribute('disabled', 'true');
+        submitBtn.textContent = 'Creating account...';
+      }
+
+      const formData = new FormData(form);
+      const name = formData.get('name');
+      const email = formData.get('email');
+      const password = formData.get('password');
+
+      try {
+        const res = await fetch('/api/auth/signup', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name, email, password })
+        });
+
+        const data = await res.json();
+        if (res.ok) {
+          window.location.href = '/app/challenges/new';
+        } else {
+          if (errorBox) {
+            errorBox.textContent = data.error || 'Failed to create account.';
+            errorBox.style.display = 'block';
+          }
+          if (submitBtn) {
+            submitBtn.removeAttribute('disabled');
+            submitBtn.textContent = 'Start Your Challenge';
+          }
+        }
+      } catch {
+        if (errorBox) {
+          errorBox.textContent = 'Network error. Please try again.';
+          errorBox.style.display = 'block';
+        }
+        if (submitBtn) {
+          submitBtn.removeAttribute('disabled');
+          submitBtn.textContent = 'Start Your Challenge';
+        }
+      }
+    });
+  }
+</script>

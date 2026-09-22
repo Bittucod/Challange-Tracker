@@ -1,0 +1,123 @@
+---
+import Icons from './Icons.astro';
+---
+
+<div id="pwa-install-banner" class="pwa-banner" style="display: none;">
+  <div class="pwa-banner-content">
+    <div class="pwa-icon-box">
+      <img src="/favicon.svg" width="28" height="28" alt="StreakGrid" />
+    </div>
+    <div class="pwa-text-box">
+      <span class="pwa-title">Add to Home Screen</span>
+      <span class="pwa-desc">Track your challenge in seconds every day.</span>
+    </div>
+  </div>
+  <div class="pwa-actions">
+    <button id="pwa-install-btn" class="btn btn-primary btn-sm">Install</button>
+    <button id="pwa-dismiss-btn" class="btn-icon pwa-dismiss" aria-label="Dismiss">
+      <Icons name="close" size={14} />
+    </button>
+  </div>
+</div>
+
+<style>
+  .pwa-banner {
+    position: fixed;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: calc(100% - 32px);
+    max-width: 440px;
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-panel);
+    box-shadow: var(--shadow-lg);
+    padding: 10px 14px;
+    z-index: 900;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+  }
+
+  .pwa-banner-content {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .pwa-icon-box {
+    width: 36px;
+    height: 36px;
+    border-radius: 8px;
+    background: var(--color-surface-subtle);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+
+  .pwa-text-box {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .pwa-title {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--color-text);
+  }
+
+  .pwa-desc {
+    font-size: 11px;
+    color: var(--color-muted);
+  }
+
+  .pwa-actions {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-shrink: 0;
+  }
+
+  .pwa-dismiss {
+    color: var(--color-muted);
+  }
+</style>
+
+<script>
+  let deferredPrompt: any = null;
+  const banner = document.getElementById('pwa-install-banner');
+  const installBtn = document.getElementById('pwa-install-btn');
+  const dismissBtn = document.getElementById('pwa-dismiss-btn');
+
+  const DISMISSED_KEY = 'streakgrid_pwa_dismissed';
+
+  window.addEventListener('beforeinstallprompt', (e) => {
+    e.preventDefault();
+    deferredPrompt = e;
+
+    const isDismissed = localStorage.getItem(DISMISSED_KEY);
+    if (!isDismissed && banner) {
+      banner.style.display = 'flex';
+    }
+  });
+
+  if (installBtn) {
+    installBtn.addEventListener('click', async () => {
+      if (banner) banner.style.display = 'none';
+      if (deferredPrompt) {
+        deferredPrompt.prompt();
+        const choice = await deferredPrompt.userChoice;
+        deferredPrompt = null;
+      }
+    });
+  }
+
+  if (dismissBtn) {
+    dismissBtn.addEventListener('click', () => {
+      if (banner) banner.style.display = 'none';
+      localStorage.setItem(DISMISSED_KEY, 'true');
+    });
+  }
+</script>

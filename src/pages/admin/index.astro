@@ -1,0 +1,780 @@
+---
+import Layout from '../../layouts/Layout.astro';
+import Icons from '../../components/Icons.astro';
+import StakeBadge from '../../components/StakeBadge.astro';
+import { getUserFromCookies } from '../../lib/auth';
+import { db } from '../../lib/db';
+import { CONFIG, formatCurrencyAmount } from '../../lib/config';
+import type { StakeCommitment, Transaction, Dispute, AuditLog, User, Challenge } from '../../lib/types';
+
+const user = getUserFromCookies(Astro.cookies);
+if (!user) {
+  return Astro.redirect('/login');
+}
+
+const isAdmin = Boolean(user.is_admin) || CONFIG.adminEmails.includes(user.email.toLowerCase());
+if (!isAdmin) {
+  return Astro.redirect('/app');
+}
+
+// Fetch all metrics
+const totalUsers = (db.prepare('SELECT COUNT(*) as count FROM users').get() as { count: number }).count;
+const totalChallenges = (db.prepare('SELECT COUNT(*) as count FROM challenges WHERE is_archived = 0').get() as { count: number }).count;
+
+const activeCommitments = db
+  .prepare(`
+    SELECT sc.*, c.name as challenge_name, u.name as user_name, u.email as user_email
+    FROM stake_commitments sc
+    JOIN challenges c ON sc.challenge_id = c.id
+    JOIN users u ON sc.user_id = u.id
+    ORDER BY sc.created_at DESC
+  `)
+  .all() as Array<StakeCommitment & { challenge_name: string; user_name: string; user_email: string }>;
+
+const totalStakedActive = activeCommitments
+  .filter((c) => c.status === 'active' || c.status === 'paid')
+  .reduce((sum, c) => sum + c.amount, 0);
+
+const disputes = db
+  .prepare(`
+    SELECT d.*, c.name as challenge_name, u.name as user_name, u.email as user_email
+    FROM disputes d
+    JOIN challenges c ON d.challenge_id = c.id
+    JOIN users u ON d.user_id = u.id
+    ORDER BY d.created_at DESC
+  `)
+  .all() as Array<Dispute & { challenge_name: string; user_name: string; user_email: string }>;
+
+const pendingDisputesCount = disputes.filter((d) => d.status === 'under_review').length;
+
+const transactions = db
+  .prepare(`
+    SELECT t.*, u.name as user_name, c.name as challenge_name
+    FROM transactions t
+    JOIN users u ON t.user_id = u.id
+    JOIN challenges c ON t.challenge_id = c.id
+    ORDER BY t.created_at DESC
+    LIMIT 100
+  `)
+  .all() as Array<Transaction & { user_name: string; challenge_name: string }>;
+
+const auditLogs = db
+  .prepare(`
+    SELECT a.*, u.name as actor_name
+    FROM audit_logs a
+    LEFT JOIN users u ON a.actor_id = u.id
+    ORDER BY a.created_at DESC
+    LIMIT 100
+  `)
+  .all() as Array<AuditLog & { actor_name?: string }>;
+---
+
+<Layout title="Admin Accountability & Ledger Panel — StreakGrid">
+  <div class="admin-viewport">
+    <header class="admin-header">
+      <div class="header-inner">
+        <div class="admin-brand">
+          <div class="brand-badge">🛡️</div>
+          <div>
+            <h1 class="admin-title">StreakGrid Admin Console</h1>
+            <span class="admin-sub">Financial Ledger, Compliance & Dispute Management</span>
+          </div>
+        </div>
+
+        <div class="admin-user-info">
+          <span class="admin-user-name">{user.name}</span>
+          <span class="admin-tag">ADMINISTRATOR</span>
+          <a href="/app" class="btn btn-secondary btn-sm">Exit to App</a>
+        </div>
+      </div>
+    </header>
+
+    <main class="admin-main">
+      <div id="admin-alert" class="alert-box" style="display: none;"></div>
+
+      <!-- Overview Metrics Grid -->
+      <div class="admin-metrics-grid">
+        <div class="admin-metric-card">
+          <span class="m-label">Active Stake Volume</span>
+          <strong class="m-value text-streak">₹{totalStakedActive.toLocaleString()}</strong>
+          <span class="m-sub">Held in regulated escrow</span>
+        </div>
+
+        <div class="admin-metric-card">
+          <span class="m-label">Total Commitments</span>
+          <strong class="m-value">{activeCommitments.length}</strong>
+          <span class="m-sub">{activeCommitments.filter((c) => c.status === 'active').length} currently active</span>
+        </div>
+
+        <div class="admin-metric-card">
+          <span class="m-label">Pending Disputes</span>
+          <strong class={`m-value ${pendingDisputesCount > 0 ? 'text-dispute' : ''}`}>
+            {pendingDisputesCount}
+          </strong>
+          <span class="m-sub">Require admin review</span>
+        </div>
+
+        <div class="admin-metric-card">
+          <span class="m-label">Ledger Transactions</span>
+          <strong class="m-value">{transactions.length}</strong>
+          <span class="m-sub">Immutable audit entries</span>
+        </div>
+      </div>
+
+      <!-- Tab Navigation -->
+      <div class="admin-tabs-bar">
+        <button class="admin-tab active" data-tab="disputes">
+          <span>Disputes & Review</span>
+          {pendingDisputesCount > 0 && <span class="tab-badge">{pendingDisputesCount}</span>}
+        </button>
+        <button class="admin-tab" data-tab="commitments">
+          <span>Stake Commitments ({activeCommitments.length})</span>
+        </button>
+        <button class="admin-tab" data-tab="ledger">
+          <span>Financial Ledger</span>
+        </button>
+        <button class="admin-tab" data-tab="audit">
+          <span>Audit Logs</span>
+        </button>
+      </div>
+
+      <!-- Tab 1: Disputes & Review -->
+      <section class="admin-tab-panel active" id="tab-disputes">
+        <div class="panel-card">
+          <h3 class="panel-card-title">Disputes & Outcome Appeals</h3>
+          <p class="panel-card-sub">
+            Review user claims for challenges marked as failed. Admin decisions create immutable audit logs.
+          </p>
+
+          {disputes.length === 0 ? (
+            <p class="empty-text">No disputes submitted.</p>
+          ) : (
+            <div class="table-wrap">
+              <table class="admin-table">
+                <thead>
+                  <tr>
+                    <th>User</th>
+                    <th>Challenge</th>
+                    <th>Reason / Claim</th>
+                    <th>Evidence</th>
+                    <th>Status</th>
+                    <th>Date</th>
+                    <th class="col-actions">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {disputes.map((d) => (
+                    <tr class="dispute-row">
+                      <td>
+                        <strong>{d.user_name}</strong>
+                        <span class="user-sub-email">{d.user_email}</span>
+                      </td>
+                      <td>
+                        <a href={`/challenge/${d.challenge_id}`} target="_blank" class="table-link">
+                          {d.challenge_name}
+                        </a>
+                      </td>
+                      <td class="col-claim">
+                        <p class="claim-text">{d.reason}</p>
+                        {d.resolution_note && (
+                          <div class="resolution-note-box">
+                            <strong>Resolution:</strong> {d.resolution_note}
+                          </div>
+                        )}
+                      </td>
+                      <td>
+                        {d.evidence_url ? (
+                          <a href={d.evidence_url} target="_blank" rel="noopener noreferrer" class="evidence-link">
+                            View Link ↗
+                          </a>
+                        ) : (
+                          <span class="text-muted">None</span>
+                        )}
+                      </td>
+                      <td>
+                        <span class={`status-pill pill-${d.status}`}>{d.status}</span>
+                      </td>
+                      <td>
+                        <span class="date-text">
+                          {new Date(d.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                        </span>
+                      </td>
+                      <td class="col-actions">
+                        {d.status === 'under_review' ? (
+                          <div class="dispute-actions-group">
+                            <button
+                              type="button"
+                              class="btn btn-primary btn-sm btn-resolve"
+                              data-dispute-id={d.id}
+                              data-action="reverse_refund"
+                            >
+                              Reverse & Refund
+                            </button>
+                            <button
+                              type="button"
+                              class="btn btn-outline btn-sm btn-resolve"
+                              data-dispute-id={d.id}
+                              data-action="uphold"
+                            >
+                              Uphold
+                            </button>
+                          </div>
+                        ) : (
+                          <span class="text-muted">Resolved</span>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      </section>
+
+      <!-- Tab 2: Commitments -->
+      <section class="admin-tab-panel" id="tab-commitments">
+        <div class="panel-card">
+          <h3 class="panel-card-title">All Stake Commitments</h3>
+          <p class="panel-card-sub">Overview of active, refundable, refunded, and forfeited stakes.</p>
+
+          <div class="table-wrap">
+            <table class="admin-table">
+              <thead>
+                <tr>
+                  <th>User</th>
+                  <th>Challenge</th>
+                  <th>Stake Amount</th>
+                  <th>Status</th>
+                  <th>Provider Ref</th>
+                  <th>Created</th>
+                  <th>Settled</th>
+                </tr>
+              </thead>
+              <tbody>
+                {activeCommitments.map((sc) => (
+                  <tr>
+                    <td>
+                      <strong>{sc.user_name}</strong>
+                      <span class="user-sub-email">{sc.user_email}</span>
+                    </td>
+                    <td>
+                      <a href={`/challenge/${sc.challenge_id}`} target="_blank" class="table-link">
+                        {sc.challenge_name}
+                      </a>
+                    </td>
+                    <td>
+                      <strong>{formatCurrencyAmount(sc.amount, sc.currency)}</strong>
+                    </td>
+                    <td>
+                      <StakeBadge commitment={sc} />
+                    </td>
+                    <td>
+                      <code class="code-ref">{sc.provider_payment_id || '—'}</code>
+                    </td>
+                    <td>{new Date(sc.created_at).toLocaleDateString()}</td>
+                    <td>{sc.settled_at ? new Date(sc.settled_at).toLocaleDateString() : '—'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- Tab 3: Financial Transaction Ledger -->
+      <section class="admin-tab-panel" id="tab-ledger">
+        <div class="panel-card">
+          <h3 class="panel-card-title">Immutable Transaction Ledger</h3>
+          <p class="panel-card-sub">
+            Every movement of money is recorded immutably. Never rely on an arbitrary database balance.
+          </p>
+
+          <div class="table-wrap">
+            <table class="admin-table">
+              <thead>
+                <tr>
+                  <th>Tx ID</th>
+                  <th>User</th>
+                  <th>Challenge</th>
+                  <th>Type</th>
+                  <th>Amount</th>
+                  <th>Status</th>
+                  <th>Provider Ref</th>
+                  <th>Timestamp</th>
+                </tr>
+              </thead>
+              <tbody>
+                {transactions.map((tx) => (
+                  <tr>
+                    <td><code class="code-ref">{tx.id.substring(0, 8)}...</code></td>
+                    <td>{tx.user_name}</td>
+                    <td>{tx.challenge_name}</td>
+                    <td>
+                      <span class={`type-pill pill-type-${tx.type}`}>{tx.type.toUpperCase()}</span>
+                    </td>
+                    <td>
+                      <strong>{formatCurrencyAmount(tx.amount, tx.currency)}</strong>
+                    </td>
+                    <td>
+                      <span class={`status-pill pill-${tx.status}`}>{tx.status}</span>
+                    </td>
+                    <td><code class="code-ref">{tx.provider_reference || '—'}</code></td>
+                    <td>{new Date(tx.created_at).toLocaleString()}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- Tab 4: Audit Logs -->
+      <section class="admin-tab-panel" id="tab-audit">
+        <div class="panel-card">
+          <h3 class="panel-card-title">Audit Trail</h3>
+          <p class="panel-card-sub">Tamper-evident logs of all security, settlement, and administrative events.</p>
+
+          <div class="table-wrap">
+            <table class="admin-table">
+              <thead>
+                <tr>
+                  <th>Action</th>
+                  <th>Actor</th>
+                  <th>Entity</th>
+                  <th>Metadata</th>
+                  <th>Timestamp</th>
+                </tr>
+              </thead>
+              <tbody>
+                {auditLogs.map((log) => (
+                  <tr>
+                    <td><strong>{log.action}</strong></td>
+                    <td>{log.actor_name || log.actor_id || 'System'}</td>
+                    <td>{log.entity_type} ({log.entity_id.substring(0, 8)})</td>
+                    <td><pre class="metadata-json">{log.metadata}</pre></td>
+                    <td>{new Date(log.created_at).toLocaleString()}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+</Layout>
+
+<style>
+  .admin-viewport {
+    min-height: 100vh;
+    background: #F6F6F2;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .admin-header {
+    background: #171918;
+    color: #FFFFFF;
+    padding: 16px 20px;
+    border-bottom: 1px solid #2B2E2C;
+  }
+
+  .header-inner {
+    max-width: 1400px;
+    margin: 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    flex-wrap: wrap;
+  }
+
+  .admin-brand {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .brand-badge {
+    font-size: 24px;
+  }
+
+  .admin-title {
+    font-size: 18px;
+    font-weight: 700;
+    color: #FFFFFF;
+  }
+
+  .admin-sub {
+    font-size: 12px;
+    color: #9CA3AF;
+  }
+
+  .admin-user-info {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .admin-user-name {
+    font-size: 13px;
+    color: #E5E7EB;
+  }
+
+  .admin-tag {
+    font-size: 10px;
+    padding: 2px 6px;
+    border-radius: 4px;
+    background: #DC2626;
+    color: #FFFFFF;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+  }
+
+  .admin-main {
+    max-width: 1400px;
+    width: 100%;
+    margin: 0 auto;
+    padding: 24px 20px 80px 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+  }
+
+  .admin-metrics-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 14px;
+  }
+
+  .admin-metric-card {
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-panel);
+    padding: 18px 20px;
+    box-shadow: var(--shadow-sm);
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .m-label {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--color-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+
+  .m-value {
+    font-size: 24px;
+    font-weight: 800;
+    color: var(--color-text);
+  }
+
+  .text-streak {
+    color: var(--color-streak-hover);
+  }
+
+  .text-dispute {
+    color: #DC2626;
+  }
+
+  .m-sub {
+    font-size: 12px;
+    color: var(--color-muted);
+  }
+
+  /* Tab bar */
+  .admin-tabs-bar {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    border-bottom: 1px solid var(--color-border);
+    padding-bottom: 8px;
+    flex-wrap: wrap;
+  }
+
+  .admin-tab {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 16px;
+    border-radius: var(--radius-sm);
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--color-text-secondary);
+    cursor: pointer;
+    transition: all 0.1s ease;
+  }
+
+  .admin-tab:hover {
+    background: var(--color-surface-hover);
+  }
+
+  .admin-tab.active {
+    background: #171918;
+    color: #FFFFFF;
+    border-color: #171918;
+  }
+
+  .tab-badge {
+    background: #DC2626;
+    color: #FFFFFF;
+    font-size: 10px;
+    font-weight: 800;
+    padding: 2px 6px;
+    border-radius: 10px;
+  }
+
+  .admin-tab-panel {
+    display: none;
+  }
+
+  .admin-tab-panel.active {
+    display: block;
+  }
+
+  .panel-card {
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-panel);
+    padding: 24px;
+    box-shadow: var(--shadow-sm);
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .panel-card-title {
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--color-text);
+  }
+
+  .panel-card-sub {
+    font-size: 13px;
+    color: var(--color-muted);
+  }
+
+  .table-wrap {
+    width: 100%;
+    overflow-x: auto;
+  }
+
+  .admin-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+  }
+
+  .admin-table th {
+    background: #FAF9F5;
+    padding: 10px 12px;
+    text-align: left;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--color-text-secondary);
+    border-bottom: 1px solid var(--color-border);
+    white-space: nowrap;
+  }
+
+  .admin-table td {
+    padding: 12px;
+    border-bottom: 1px solid var(--color-border-subtle);
+    vertical-align: middle;
+  }
+
+  .user-sub-email {
+    display: block;
+    font-size: 11px;
+    color: var(--color-muted);
+  }
+
+  .table-link {
+    color: var(--color-text);
+    font-weight: 600;
+  }
+
+  .table-link:hover {
+    color: var(--color-primary-hover);
+  }
+
+  .col-claim {
+    max-width: 260px;
+  }
+
+  .claim-text {
+    font-size: 12px;
+    color: var(--color-text);
+    line-height: 1.4;
+  }
+
+  .resolution-note-box {
+    margin-top: 4px;
+    font-size: 11px;
+    color: var(--color-muted);
+    background: var(--color-surface-subtle);
+    padding: 4px 6px;
+    border-radius: 4px;
+  }
+
+  .evidence-link {
+    font-size: 12px;
+    color: var(--color-primary-hover);
+    font-weight: 600;
+  }
+
+  .status-pill {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+  }
+
+  .pill-under_review {
+    background: #EFF6FF;
+    color: #1D4ED8;
+  }
+
+  .pill-reversed {
+    background: #ECFDF5;
+    color: #15803D;
+  }
+
+  .pill-upheld {
+    background: #FEE2E2;
+    color: #B91C1C;
+  }
+
+  .pill-completed {
+    background: #ECFDF5;
+    color: #15803D;
+  }
+
+  .type-pill {
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 10px;
+    font-weight: 700;
+  }
+
+  .pill-type-deposit {
+    background: #FEF3C7;
+    color: #B45309;
+  }
+
+  .pill-type-refund {
+    background: #ECFDF5;
+    color: #15803D;
+  }
+
+  .pill-type-forfeiture {
+    background: #F4F4F0;
+    color: #777B78;
+  }
+
+  .code-ref {
+    font-family: monospace;
+    font-size: 11px;
+    background: var(--color-surface-subtle);
+    padding: 2px 4px;
+    border-radius: 3px;
+  }
+
+  .dispute-actions-group {
+    display: flex;
+    gap: 6px;
+  }
+
+  .metadata-json {
+    font-family: monospace;
+    font-size: 10px;
+    color: var(--color-muted);
+    max-width: 320px;
+    overflow-x: auto;
+    white-space: pre-wrap;
+  }
+
+  .alert-box {
+    padding: 10px 14px;
+    border-radius: var(--radius-sm);
+    font-size: 13px;
+  }
+
+  .alert-box.success {
+    background: var(--color-primary-light);
+    color: var(--color-primary-hover);
+    border: 1px solid rgba(34, 197, 94, 0.3);
+  }
+
+  .alert-box.error {
+    background: #FEE2E2;
+    color: #B91C1C;
+    border: 1px solid #FCA5A5;
+  }
+
+  @media (max-width: 900px) {
+    .admin-metrics-grid {
+      grid-template-columns: 1fr 1fr;
+    }
+  }
+</style>
+
+<script>
+  // Tab switching
+  const tabs = document.querySelectorAll('.admin-tab');
+  const panels = document.querySelectorAll('.admin-tab-panel');
+
+  tabs.forEach((tab) => {
+    tab.addEventListener('click', () => {
+      tabs.forEach((t) => t.classList.remove('active'));
+      panels.forEach((p) => p.classList.remove('active'));
+
+      tab.classList.add('active');
+      const targetId = `tab-${(tab as HTMLElement).dataset.tab}`;
+      const targetPanel = document.getElementById(targetId);
+      if (targetPanel) targetPanel.classList.add('active');
+    });
+  });
+
+  // Dispute resolution actions
+  const alertBox = document.getElementById('admin-alert');
+  document.querySelectorAll('.btn-resolve').forEach((btn) => {
+    btn.addEventListener('click', async () => {
+      const disputeId = (btn as HTMLElement).dataset.disputeId;
+      const action = (btn as HTMLElement).dataset.action;
+      if (!disputeId || !action) return;
+
+      const note = prompt(
+        action === 'reverse_refund'
+          ? 'Enter note for refund approval:'
+          : 'Enter note for upholding challenge outcome:'
+      );
+      if (note === null) return;
+
+      try {
+        const res = await fetch('/api/admin/resolve-dispute', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ disputeId, action, resolutionNote: note })
+        });
+
+        const data = await res.json();
+        if (res.ok) {
+          alert(data.message || 'Dispute updated successfully!');
+          window.location.reload();
+        } else {
+          alert(data.error || 'Failed to update dispute');
+        }
+      } catch {
+        alert('Network error');
+      }
+    });
+  });
+</script>

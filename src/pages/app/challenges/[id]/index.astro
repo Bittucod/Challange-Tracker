@@ -1,0 +1,404 @@
+---
+import AppLayout from '../../../../layouts/AppLayout.astro';
+import StreakBanner from '../../../../components/StreakBanner.astro';
+import TrackerGrid from '../../../../components/TrackerGrid.astro';
+import ShareCardModal from '../../../../components/ShareCardModal.astro';
+import Icons from '../../../../components/Icons.astro';
+import { getUserFromCookies } from '../../../../lib/auth';
+import { db } from '../../../../lib/db';
+import { calculateChallengeAnalytics } from '../../../../lib/engine';
+import { getChallengeStakeCommitment } from '../../../../lib/stakes';
+import { formatCurrencyAmount } from '../../../../lib/config';
+import type { Challenge, Activity, DailyRecord, Milestone } from '../../../../lib/types';
+
+const user = getUserFromCookies(Astro.cookies);
+if (!user) {
+  return Astro.redirect('/login');
+}
+
+const { id } = Astro.params;
+if (!id) {
+  return Astro.redirect('/app');
+}
+
+const challenge = db
+  .prepare('SELECT * FROM challenges WHERE id = ? AND user_id = ?')
+  .get(id, user.id) as Challenge | undefined;
+
+if (!challenge) {
+  return Astro.redirect('/app');
+}
+
+const activities = db
+  .prepare('SELECT * FROM activities WHERE challenge_id = ? ORDER BY sort_order ASC')
+  .all(id) as Activity[];
+
+const records = db
+  .prepare('SELECT * FROM daily_records WHERE challenge_id = ?')
+  .all(id) as DailyRecord[];
+
+const milestones = db
+  .prepare('SELECT * FROM milestones WHERE challenge_id = ? ORDER BY target_days ASC')
+  .all(id) as Milestone[];
+
+const analytics = calculateChallengeAnalytics(challenge, activities, records);
+const commitment = challenge.challenge_type === 'stake' ? getChallengeStakeCommitment(challenge.id) : null;
+const isJustStaked = Astro.url.searchParams.get('staked') === 'true';
+const formattedStake = commitment ? formatCurrencyAmount(commitment.amount, commitment.currency) : '';
+---
+
+<AppLayout title={`${challenge.name} — StreakGrid`} activeChallengeId={challenge.id}>
+  <div class="tracker-page-view">
+    <!-- Top Progress & Tab Banner -->
+    <StreakBanner
+      challenge={challenge}
+      analytics={analytics}
+      activeTab="tracker"
+    />
+
+    <!-- The Hero Tracker Spreadsheet Grid -->
+    <section class="tracker-grid-hero-section">
+      <TrackerGrid
+        challenge={challenge}
+        activities={activities}
+        days={analytics.days}
+      />
+    </section>
+
+    <!-- Share Card Modal -->
+    <ShareCardModal
+      challenge={challenge}
+      activities={activities}
+      analytics={analytics}
+    />
+
+    {commitment && (
+      <div
+        id="staked-confirmation-modal"
+        class={`modal-overlay ${isJustStaked ? 'active' : ''}`}
+        role="dialog"
+        aria-modal="true"
+        style={isJustStaked ? 'display: flex;' : 'display: none;'}
+      >
+        <div class="modal-content staked-modal-card">
+          <div class="staked-modal-top">
+            <div class="staked-badge-pill">
+              <span class="staked-fire">🔥</span>
+              <span>Accountability Commitment Activated</span>
+            </div>
+            <button type="button" id="btn-close-staked-modal" class="btn-icon modal-close-btn" aria-label="Close">✕</button>
+          </div>
+
+          <div class="staked-modal-hero">
+            <div class="staked-icon-circle">🛡️</div>
+            <h2 class="staked-modal-title">Your Stake is Secured in Escrow!</h2>
+            <p class="staked-modal-sub">
+              You've put real skin in the game for <strong>{challenge.name}</strong>. Your challenge has officially begun!
+            </p>
+          </div>
+
+          <div class="staked-financial-summary">
+            <div class="staked-fin-box">
+              <span class="staked-fin-label">Locked Stake Deposit</span>
+              <span class="staked-fin-value">{formattedStake}</span>
+              <span class="staked-fin-tag">● Ring-Fenced Third-Party Escrow</span>
+            </div>
+          </div>
+
+          <div class="staked-legal-golden-rule">
+            <div class="golden-rule-head">
+              <span class="golden-rule-icon">⚖️</span>
+              <h4 class="golden-rule-title">The Golden Rule: How to Get Your Stake Back</h4>
+            </div>
+            <p class="golden-rule-p">
+              Your <strong>{formattedStake}</strong> deposit will be returned in full to your original payment method <strong>ONLY IF</strong> you successfully complete the challenge by meeting your locked daily criteria.
+            </p>
+            <p class="golden-rule-sub">
+              If the challenge ends without fulfilling the consistency requirements, your deposit is forfeited strictly under our published challenge rules.
+            </p>
+          </div>
+
+          <div class="staked-rules-summary">
+            <h5 class="staked-summary-head">Your Locked Rules:</h5>
+            <ul class="staked-summary-list">
+              <li>
+                <strong>Duration:</strong> {challenge.duration} Days ({challenge.start_date} to {challenge.end_date})
+              </li>
+              <li>
+                <strong>Daily Cutoff:</strong> Day closes at 23:59:59 (no retroactive edits permitted)
+              </li>
+              <li>
+                <strong>Daily Habit Target:</strong>{' '}
+                {challenge.success_rule === 'all' && 'Complete ALL daily activities every day'}
+                {challenge.success_rule === 'at_least_one' && 'Complete at least one activity every day'}
+                {challenge.success_rule === 'custom_min' && `Complete at least ${challenge.success_min_count} activities every day`}
+              </li>
+            </ul>
+          </div>
+
+          <div class="staked-modal-footer">
+            <button type="button" id="btn-dismiss-staked-modal" class="btn btn-primary btn-ship-day1">
+              <span>I Understand — Let's Ship Day 1!</span>
+              <Icons name="check" size={16} />
+            </button>
+          </div>
+        </div>
+      </div>
+    )}
+  </div>
+</AppLayout>
+
+<style>
+  .tracker-page-view {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .tracker-grid-hero-section {
+    position: relative;
+    width: 100%;
+  }
+
+  /* Post-Payment Staked Confirmation Modal */
+  .staked-modal-card {
+    max-width: 540px;
+    width: 100%;
+    background: var(--color-surface);
+    border-radius: var(--radius-modal);
+    box-shadow: var(--shadow-lg);
+    padding: 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    animation: subtleFadeIn 0.25s ease;
+  }
+
+  .staked-modal-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .staked-badge-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--color-streak-hover);
+    background: var(--color-streak-soft);
+    padding: 3px 10px;
+    border-radius: 20px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+
+  .modal-close-btn {
+    font-size: 16px;
+    color: var(--color-muted);
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 4px;
+  }
+
+  .staked-modal-hero {
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .staked-icon-circle {
+    width: 52px;
+    height: 52px;
+    border-radius: 50%;
+    background: #F4FAF6;
+    border: 1px solid rgba(34, 197, 94, 0.3);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 26px;
+  }
+
+  .staked-modal-title {
+    font-size: 22px;
+    font-weight: 800;
+    color: var(--color-text);
+    letter-spacing: -0.02em;
+  }
+
+  .staked-modal-sub {
+    font-size: 13px;
+    color: var(--color-text-secondary);
+    line-height: 1.45;
+  }
+
+  .staked-financial-summary {
+    display: flex;
+    justify-content: center;
+  }
+
+  .staked-fin-box {
+    background: #FAF9F5;
+    border: 1px solid rgba(245, 158, 11, 0.35);
+    border-radius: var(--radius-sm);
+    padding: 12px 20px;
+    text-align: center;
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+  }
+
+  .staked-fin-label {
+    font-size: 11px;
+    text-transform: uppercase;
+    color: var(--color-muted);
+    letter-spacing: 0.04em;
+    font-weight: 600;
+  }
+
+  .staked-fin-value {
+    font-size: 28px;
+    font-weight: 800;
+    color: var(--color-streak-hover);
+    letter-spacing: -0.02em;
+  }
+
+  .staked-fin-tag {
+    font-size: 11px;
+    color: var(--color-primary-hover);
+    font-weight: 600;
+  }
+
+  .staked-legal-golden-rule {
+    background: #F4FAF6;
+    border: 1px solid rgba(34, 197, 94, 0.3);
+    border-radius: var(--radius-sm);
+    padding: 12px 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .golden-rule-head {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .golden-rule-title {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--color-text);
+  }
+
+  .golden-rule-p {
+    font-size: 12px;
+    color: var(--color-text);
+    line-height: 1.45;
+    margin: 0;
+  }
+
+  .golden-rule-sub {
+    font-size: 11px;
+    color: var(--color-muted);
+    line-height: 1.4;
+    margin: 0;
+    font-style: italic;
+  }
+
+  .staked-rules-summary {
+    background: var(--color-surface-subtle);
+    border-radius: var(--radius-sm);
+    padding: 10px 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .staked-summary-head {
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--color-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+  }
+
+  .staked-summary-list {
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    font-size: 12px;
+    color: var(--color-text);
+  }
+
+  .staked-summary-list li::before {
+    content: '• ';
+    color: var(--color-primary);
+    font-weight: bold;
+  }
+
+  .staked-modal-footer {
+    display: flex;
+    justify-content: stretch;
+    margin-top: 4px;
+  }
+
+  .btn-ship-day1 {
+    width: 100%;
+    padding: 12px;
+    font-size: 14px;
+    font-weight: 700;
+    justify-content: center;
+    gap: 8px;
+    background: var(--color-primary);
+  }
+
+  .btn-ship-day1:hover {
+    background: var(--color-primary-hover);
+  }
+</style>
+
+<script>
+  import { triggerConfetti } from '../../../../scripts/confetti';
+
+  const modal = document.getElementById('staked-confirmation-modal');
+  const closeBtn = document.getElementById('btn-close-staked-modal');
+  const dismissBtn = document.getElementById('btn-dismiss-staked-modal');
+
+  const urlParams = new URLSearchParams(window.location.search);
+  if (urlParams.get('staked') === 'true' && modal) {
+    modal.style.display = 'flex';
+    modal.classList.add('active');
+    triggerConfetti();
+
+    // Clean URL without page reload
+    const cleanUrl = window.location.pathname;
+    window.history.replaceState({}, document.title, cleanUrl);
+  }
+
+  function closeModal() {
+    if (modal) {
+      modal.style.display = 'none';
+      modal.classList.remove('active');
+    }
+    const day1Cell = document.querySelector('[data-day="1"]');
+    if (day1Cell) {
+      (day1Cell as HTMLElement).scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+  }
+
+  if (closeBtn) closeBtn.addEventListener('click', closeModal);
+  if (dismissBtn) dismissBtn.addEventListener('click', closeModal);
+  if (modal) {
+    modal.addEventListener('click', (e) => {
+      if (e.target === modal) closeModal();
+    });
+  }
+</script>

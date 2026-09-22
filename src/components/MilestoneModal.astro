@@ -1,0 +1,192 @@
+---
+import Icons from './Icons.astro';
+---
+
+<div id="milestone-modal" class="modal-overlay" role="dialog" aria-modal="true">
+  <div class="modal-content milestone-content">
+    <div class="milestone-badge-icon">
+      <span class="emoji-trophy">🎉</span>
+    </div>
+
+    <div class="milestone-header">
+      <h2 id="milestone-title" class="milestone-heading">50 DAY STREAK</h2>
+      <p id="milestone-subtitle" class="milestone-sub">You showed up for 50 days straight.</p>
+    </div>
+
+    <div class="milestone-stats-box">
+      <div class="m-stat">
+        <span class="m-stat-label">Milestone</span>
+        <span id="milestone-stat-days" class="m-stat-value">50 Days</span>
+      </div>
+      <div class="m-stat-divider"></div>
+      <div class="m-stat">
+        <span class="m-stat-label">Current Streak</span>
+        <span id="milestone-stat-streak" class="m-stat-value">🔥 50</span>
+      </div>
+    </div>
+
+    <div class="milestone-actions">
+      <button id="btn-milestone-share" class="btn btn-primary" type="button">
+        <Icons name="share" size={16} />
+        <span>Share Achievement</span>
+      </button>
+      <button id="btn-milestone-close" class="btn btn-secondary" type="button">
+        Keep Going
+      </button>
+    </div>
+  </div>
+</div>
+
+<style>
+  .milestone-content {
+    text-align: center;
+    max-width: 420px;
+    padding: 32px 24px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 20px;
+  }
+
+  .milestone-badge-icon {
+    width: 64px;
+    height: 64px;
+    border-radius: 50%;
+    background: #FEF3C7;
+    border: 2px solid #FDE68A;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .emoji-trophy {
+    font-size: 32px;
+  }
+
+  .milestone-header {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .milestone-heading {
+    font-size: 24px;
+    font-weight: 800;
+    color: var(--color-text);
+    letter-spacing: -0.02em;
+  }
+
+  .milestone-sub {
+    font-size: 14px;
+    color: var(--color-muted);
+  }
+
+  .milestone-stats-box {
+    display: flex;
+    align-items: center;
+    justify-content: space-around;
+    width: 100%;
+    background: var(--color-surface-subtle);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-panel);
+    padding: 12px 16px;
+  }
+
+  .m-stat {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .m-stat-label {
+    font-size: 11px;
+    color: var(--color-muted);
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+
+  .m-stat-value {
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--color-text);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .m-stat-divider {
+    width: 1px;
+    height: 28px;
+    background: var(--color-border);
+  }
+
+  .milestone-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    width: 100%;
+  }
+
+  .milestone-actions .btn {
+    width: 100%;
+    padding: 10px;
+  }
+</style>
+
+<script>
+  import { triggerConfetti } from '../scripts/confetti';
+
+  const modal = document.getElementById('milestone-modal');
+  const titleEl = document.getElementById('milestone-title');
+  const subEl = document.getElementById('milestone-subtitle');
+  const statDaysEl = document.getElementById('milestone-stat-days');
+  const statStreakEl = document.getElementById('milestone-stat-streak');
+  const closeBtn = document.getElementById('btn-milestone-close');
+  const shareBtn = document.getElementById('btn-milestone-share');
+
+  let currentMilestoneTarget = 0;
+
+  function openMilestone(target: number, streak: number) {
+    if (!modal) return;
+    currentMilestoneTarget = target;
+    if (titleEl) titleEl.textContent = `${target} DAY MILESTONE REACHED`;
+    if (subEl) subEl.textContent = `You showed up and stayed consistent for ${target} days!`;
+    if (statDaysEl) statDaysEl.textContent = `${target} Days`;
+    if (statStreakEl) statStreakEl.textContent = `🔥 ${streak}`;
+
+    modal.classList.add('active');
+    triggerConfetti();
+  }
+
+  function closeModal() {
+    if (modal) modal.classList.remove('active');
+  }
+
+  if (closeBtn) closeBtn.addEventListener('click', closeModal);
+
+  // Close on backdrop click
+  if (modal) {
+    modal.addEventListener('click', (e) => {
+      if (e.target === modal) closeModal();
+    });
+  }
+
+  // Hook into share card modal
+  if (shareBtn) {
+    shareBtn.addEventListener('click', () => {
+      closeModal();
+      const openShareEvent = new CustomEvent('streakgrid:open-share', {
+        detail: { milestoneTitle: `🎉 ${currentMilestoneTarget} DAY MILESTONE REACHED` }
+      });
+      window.dispatchEvent(openShareEvent);
+    });
+  }
+
+  // Listen for custom milestone trigger event
+  window.addEventListener('streakgrid:milestone', (e: any) => {
+    const detail = e.detail;
+    if (detail && detail.milestones && detail.milestones.length > 0) {
+      const highest = Math.max(...detail.milestones);
+      openMilestone(highest, detail.streak || highest);
+    }
+  });
+</script>

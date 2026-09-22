@@ -1,0 +1,959 @@
+---
+import type { EvaluatedBadge } from '../lib/badges';
+
+interface Props {
+  badges: EvaluatedBadge[];
+}
+
+const { badges } = Astro.props;
+
+const unlockedCount = badges.filter((b) => b.isUnlocked).length;
+const totalCount = badges.length;
+---
+
+<div class="badges-showcase-wrapper" id="badges-showcase-section">
+  <!-- Showcase Header -->
+  <div class="showcase-header">
+    <div class="showcase-header-left">
+      <div class="header-title-row">
+        <h2 class="showcase-title">Badges & Achievements</h2>
+        <span class="unlocked-counter-badge">
+          <span class="counter-sparkle">✦</span>
+          <strong>{unlockedCount}</strong> of {totalCount} Unlocked
+        </span>
+      </div>
+      <p class="showcase-subtitle">Earned through verified streaks, accountability stakes, and daily habits.</p>
+    </div>
+
+    <!-- Carousel Nav Buttons -->
+    <div class="carousel-nav-btns">
+      <button type="button" class="btn-carousel-nav btn-prev" id="btn-badge-carousel-prev" aria-label="Scroll badges left">
+        ‹
+      </button>
+      <button type="button" class="btn-carousel-nav btn-next" id="btn-badge-carousel-next" aria-label="Scroll badges right">
+        ›
+      </button>
+    </div>
+  </div>
+
+  <!-- Filter Pills Bar -->
+  <div class="badge-filter-bar">
+    <button class="badge-filter-pill active" data-category="all">
+      All ({totalCount})
+    </button>
+    <button class="badge-filter-pill" data-category="earned">
+      Earned ({unlockedCount})
+    </button>
+    <button class="badge-filter-pill" data-category="locked">
+      In Progress ({totalCount - unlockedCount})
+    </button>
+    <div class="filter-divider"></div>
+    <button class="badge-filter-pill" data-category="Streaks">Streaks</button>
+    <button class="badge-filter-pill" data-category="Challenges">Challenges</button>
+    <button class="badge-filter-pill" data-category="Stakes">Stakes</button>
+    <button class="badge-filter-pill" data-category="Habits">Habits & Notes</button>
+    <button class="badge-filter-pill" data-category="Community">Community</button>
+  </div>
+
+  <!-- Badges Horizontal Carousel -->
+  <div class="badges-carousel-container" id="badges-carousel-track">
+    {badges.map((badge) => {
+      const isUnlocked = badge.isUnlocked;
+      return (
+        <div
+          class={`badge-item-card ${isUnlocked ? 'badge-unlocked' : 'badge-locked'}`}
+          data-category={badge.category}
+          data-status={isUnlocked ? 'earned' : 'locked'}
+          data-badge-key={badge.key}
+          data-title={badge.title}
+          data-desc={badge.description}
+          data-date={badge.formattedAwardedDate || ''}
+          data-progress-text={badge.progressText}
+          data-percent={badge.progressPercent}
+          tabindex="0"
+          role="button"
+          aria-label={`${badge.title} badge: ${isUnlocked ? `Unlocked on ${badge.formattedAwardedDate}` : `Locked, ${badge.progressText}`}`}
+        >
+          <div class="badge-medallion-frame">
+            <div class="badge-medallion-inner">
+              <svg class="badge-svg-emblem" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <defs>
+                  <linearGradient id={`bg-${badge.key}`} x1="0%" y1="0%" x2="100%" y2="100%">
+                    {badge.category === 'Streaks' && (
+                      <>
+                        <stop offset="0%" stop-color="#FF6B00" />
+                        <stop offset="100%" stop-color="#EA580C" />
+                      </>
+                    )}
+                    {badge.category === 'Challenges' && (
+                      <>
+                        <stop offset="0%" stop-color="#10B981" />
+                        <stop offset="100%" stop-color="#047857" />
+                      </>
+                    )}
+                    {badge.category === 'Stakes' && (
+                      <>
+                        <stop offset="0%" stop-color="#F59E0B" />
+                        <stop offset="100%" stop-color="#B45309" />
+                      </>
+                    )}
+                    {badge.category === 'Habits' && (
+                      <>
+                        <stop offset="0%" stop-color="#3B82F6" />
+                        <stop offset="100%" stop-color="#1D4ED8" />
+                      </>
+                    )}
+                    {badge.category === 'Community' && (
+                      <>
+                        <stop offset="0%" stop-color="#8B5CF6" />
+                        <stop offset="100%" stop-color="#6D28D9" />
+                      </>
+                    )}
+                  </linearGradient>
+
+                  <linearGradient id={`gold-rim-${badge.key}`} x1="0%" y1="0%" x2="100%" y2="100%">
+                    <stop offset="0%" stop-color="#FDE68A" />
+                    <stop offset="50%" stop-color="#F59E0B" />
+                    <stop offset="100%" stop-color="#B45309" />
+                  </linearGradient>
+                </defs>
+
+                <circle cx="32" cy="32" r="30" fill={`url(#bg-${badge.key})`} class="emblem-base-circle" />
+
+                {badge.key === 'first_step' && (
+                  <g>
+                    <path d="M22 38L30 22L34 28L42 16L34 32L30 26L22 38Z" fill="#FFFFFF" />
+                    <circle cx="44" cy="18" r="2.5" fill="#FEF08A" />
+                    <circle cx="20" cy="40" r="2" fill="#FEF08A" />
+                  </g>
+                )}
+
+                {badge.key === 'streak_3' && (
+                  <g>
+                    <path d="M32 12C32 12 37 20 37 26C37 28.5 35.8 30.7 34 32C36.5 33.5 38 36.5 38 40C38 45 34.5 49 30 49C25.5 49 22 45 22 40C22 34 26 28 26 28C26 28 28 32 30 32C32 32 33 28 32 12Z" fill="#FFFFFF" />
+                    <path d="M31 36C31 36 33 38 33 40C33 42 31.8 44 30 44C28.2 44 27 42 27 40C27 38 29 36 31 36Z" fill="#FEF08A" />
+                  </g>
+                )}
+
+                {badge.key === 'streak_7' && (
+                  <g>
+                    <path d="M32 14L44 19V31C44 40 38 46 32 49C26 46 20 40 20 31V19L32 14Z" fill="#FFFFFF" />
+                    <path d="M32 23L34 28H39L35 31L36.5 36L32 33L27.5 36L29 31L25 28H30L32 23Z" fill="#EA580C" />
+                  </g>
+                )}
+
+                {badge.key === 'streak_14' && (
+                  <g>
+                    <path d="M20 18L32 30L29 33L17 21L15 25L13 23L16 16L23 19L21 21L20 18Z" fill="#FFFFFF" />
+                    <path d="M44 18L32 30L35 33L47 21L49 25L51 23L48 16L41 19L43 21L44 18Z" fill="#FFFFFF" />
+                    <circle cx="32" cy="42" r="5" fill="#FEF08A" />
+                  </g>
+                )}
+
+                {badge.key === 'streak_30' && (
+                  <g>
+                    <path d="M18 43H46V46H18V43Z" fill="#FEF08A" />
+                    <path d="M18 41L21 23L28 31L32 18L36 31L43 23L46 41H18Z" fill="#FFFFFF" />
+                    <circle cx="21" cy="21" r="2" fill="#FEF08A" />
+                    <circle cx="32" cy="16" r="2.5" fill="#FEF08A" />
+                    <circle cx="43" cy="21" r="2" fill="#FEF08A" />
+                  </g>
+                )}
+
+                {badge.key === 'streak_50' && (
+                  <g>
+                    <path d="M23 23L32 13L41 23L32 49L23 23Z" fill="#FFFFFF" />
+                    <path d="M17 23L23 23L32 49L17 23Z" fill="#BFDBFE" />
+                    <path d="M47 23L41 23L32 49L47 23Z" fill="#93C5FD" />
+                    <path d="M23 23L32 13L41 23H23Z" fill="#DBEAFE" />
+                  </g>
+                )}
+
+                {badge.key === 'streak_100' && (
+                  <g>
+                    <path d="M24 16H40V28C40 33 36 37 32 37C28 37 24 33 24 28V16Z" fill="#FFFFFF" />
+                    <path d="M24 20H18C16 20 16 26 20 27L24 28V20Z" fill="#FEF08A" />
+                    <path d="M40 20H46C48 20 48 26 44 27L40 28V20Z" fill="#FEF08A" />
+                    <path d="M29 37H35V43H29V37Z" fill="#FFFFFF" />
+                    <path d="M22 43H42V47H22V43Z" fill="#FEF08A" />
+                    <circle cx="32" cy="24" r="3" fill="#EA580C" />
+                  </g>
+                )}
+
+                {badge.key === 'challenge_pioneer' && (
+                  <g>
+                    <path d="M32 12C38 16 41 24 40 33L32 37L24 33C23 24 26 16 32 12Z" fill="#FFFFFF" />
+                    <path d="M24 33L18 36L20 41L25 39L24 33Z" fill="#A7F3D0" />
+                    <path d="M40 33L46 36L44 41L39 39L40 33Z" fill="#A7F3D0" />
+                    <circle cx="32" cy="24" r="3.5" fill="#047857" />
+                    <path d="M30 37L32 47L34 37H30Z" fill="#FDE68A" />
+                  </g>
+                )}
+
+                {badge.key === 'triple_threat' && (
+                  <g>
+                    <circle cx="32" cy="32" r="16" stroke="#FFFFFF" stroke-width="3" />
+                    <circle cx="32" cy="32" r="10" stroke="#FFFFFF" stroke-width="2.5" />
+                    <circle cx="32" cy="32" r="4.5" fill="#FFFFFF" />
+                    <circle cx="44" cy="20" r="2.5" fill="#FDE68A" />
+                    <circle cx="20" cy="44" r="2.5" fill="#FDE68A" />
+                  </g>
+                )}
+
+                {badge.key === 'challenge_finisher' && (
+                  <g>
+                    <path d="M20 14V48" stroke="#FFFFFF" stroke-width="3" stroke-linecap="round" />
+                    <path d="M22 16H42L39 23L44 31H22V16Z" fill="#FFFFFF" />
+                    <rect x="24" y="18" width="5" height="5" fill="#047857" />
+                    <rect x="34" y="18" width="5" height="5" fill="#047857" />
+                    <rect x="29" y="24" width="5" height="5" fill="#047857" />
+                  </g>
+                )}
+
+                {badge.key === 'multi_track' && (
+                  <g>
+                    <circle cx="32" cy="32" r="12" stroke="#FFFFFF" stroke-width="4" stroke-dasharray="6 4" />
+                    <path d="M32 16V48M16 32H48" stroke="#FFFFFF" stroke-width="3" stroke-linecap="round" />
+                    <circle cx="32" cy="32" r="5" fill="#FEF08A" />
+                  </g>
+                )}
+
+                {badge.key === 'skin_in_the_game' && (
+                  <g>
+                    <circle cx="32" cy="32" r="15" fill="#FFFFFF" />
+                    <circle cx="32" cy="32" r="12" fill="#F59E0B" />
+                    <text x="32" y="38" font-size="18" font-weight="bold" fill="#FFFFFF" text-anchor="middle">$</text>
+                    <circle cx="43" cy="20" r="2.5" fill="#FEF08A" />
+                  </g>
+                )}
+
+                {badge.key === 'high_stakes' && (
+                  <g>
+                    <rect x="18" y="18" width="28" height="28" rx="4" fill="#FFFFFF" />
+                    <circle cx="32" cy="32" r="8" fill="#B45309" />
+                    <circle cx="32" cy="32" r="4" fill="#FEF08A" />
+                    <rect x="42" y="28" width="6" height="8" rx="2" fill="#FEF08A" />
+                  </g>
+                )}
+
+                {badge.key === 'escrow_victor' && (
+                  <g>
+                    <path d="M32 14V46M20 22H44" stroke="#FFFFFF" stroke-width="3" stroke-linecap="round" />
+                    <path d="M16 28L20 22L24 28H16Z" fill="#FEF08A" />
+                    <path d="M40 28L44 22L48 28H40Z" fill="#FEF08A" />
+                    <path d="M26 43L30 47L38 39" stroke="#FEF08A" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round" />
+                  </g>
+                )}
+
+                {badge.key === 'note_taker' && (
+                  <g>
+                    <path d="M22 18H36L44 26V46H22V18Z" fill="#FFFFFF" />
+                    <path d="M36 18V26H44" fill="#BFDBFE" />
+                    <path d="M26 28H34M26 34H38M26 40H34" stroke="#1D4ED8" stroke-width="2" stroke-linecap="round" />
+                    <path d="M42 16L38 24L44 26L48 18L42 16Z" fill="#FEF08A" />
+                  </g>
+                )}
+
+                {badge.key === 'daily_chronicler' && (
+                  <g>
+                    <rect x="20" y="16" width="24" height="32" rx="3" fill="#FFFFFF" />
+                    <path d="M26 16V30L30 27L34 30V16H26Z" fill="#EF4444" />
+                    <path d="M20 44H44" stroke="#93C5FD" stroke-width="2.5" />
+                  </g>
+                )}
+
+                {badge.key === 'fifty_checks' && (
+                  <g>
+                    <circle cx="32" cy="32" r="14" fill="#FFFFFF" />
+                    <path d="M24 32L29 37L39 26" stroke="#2563EB" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round" />
+                    <circle cx="43" cy="18" r="2.5" fill="#FEF08A" />
+                    <circle cx="19" cy="41" r="2" fill="#FEF08A" />
+                  </g>
+                )}
+
+                {badge.key === 'centurion_logger' && (
+                  <g>
+                    <circle cx="32" cy="32" r="16" fill="#FFFFFF" />
+                    <circle cx="32" cy="32" r="12" fill="#1E40AF" />
+                    <text x="32" y="38" font-size="14" font-weight="900" fill="#FEF08A" text-anchor="middle">100</text>
+                  </g>
+                )}
+
+                {badge.key === 'proof_of_work' && (
+                  <g>
+                    <circle cx="32" cy="30" r="14" fill="#FFFFFF" />
+                    <path d="M26 40L24 48L32 44L40 48L38 40" fill="#FEF08A" />
+                    <path d="M26 29L30 33L38 25" stroke="#7C3AED" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round" />
+                  </g>
+                )}
+
+                {badge.key === 'community_cheer' && (
+                  <g>
+                    <path d="M26 26C26 22 30 20 33 24L38 31C40 33 39 37 36 39L29 44C26 46 22 43 23 40L26 26Z" fill="#FFFFFF" />
+                    <circle cx="38" cy="18" r="2.5" fill="#FEF08A" />
+                    <circle cx="46" cy="26" r="2" fill="#FEF08A" />
+                    <circle cx="20" cy="20" r="2" fill="#FEF08A" />
+                  </g>
+                )}
+
+                {isUnlocked && (
+                  <g class="sparkle-layer">
+                    <path d="M50 14L51.5 17.5L55 19L51.5 20.5L50 24L48.5 20.5L45 19L48.5 17.5L50 14Z" fill="#FFFBEB" />
+                    <circle cx="12" cy="26" r="1.5" fill="#FFFBEB" />
+                  </g>
+                )}
+              </svg>
+            </div>
+          </div>
+
+          <div class="badge-card-info">
+            <span class="badge-title">{badge.title}</span>
+
+            {isUnlocked ? (
+              <span class="badge-subtitle date-unlocked">
+                {badge.formattedAwardedDate || 'Earned'}
+              </span>
+            ) : (
+              <div class="badge-locked-progress-box">
+                <span class="badge-subtitle progress-ratio">
+                  {badge.progressText}
+                </span>
+                <div class="badge-progress-track" title={`${badge.progressPercent}% complete`}>
+                  <div class="badge-progress-fill" style={`width: ${badge.progressPercent}%;`}></div>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      );
+    })}
+  </div>
+
+  <!-- Interactive Badge Detail Popover / Modal -->
+  <div id="badge-detail-modal" class="badge-modal-overlay" style="display: none;">
+    <div class="badge-detail-card" role="dialog" aria-modal="true">
+      <button type="button" class="btn-badge-modal-close" id="btn-close-badge-modal" aria-label="Close details">✕</button>
+      
+      <div class="modal-badge-icon-wrap" id="modal-badge-icon-target">
+        <!-- Injected dynamically on click -->
+      </div>
+
+      <div class="modal-badge-body">
+        <div class="modal-category-tag" id="modal-badge-category">Streaks</div>
+        <h3 class="modal-badge-title" id="modal-badge-title">Badge Title</h3>
+        <p class="modal-badge-desc" id="modal-badge-desc">Badge criteria description.</p>
+
+        <div class="modal-badge-status-box" id="modal-badge-status-box">
+          <!-- Injected dynamically based on earned vs in-progress -->
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<style>
+  .badges-showcase-wrapper {
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-panel);
+    padding: 24px 28px;
+    box-shadow: var(--shadow-sm);
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    position: relative;
+  }
+
+  .showcase-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 16px;
+    flex-wrap: wrap;
+  }
+
+  .showcase-header-left {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .header-title-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+
+  .showcase-title {
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--color-text);
+    margin: 0;
+  }
+
+  .unlocked-counter-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--color-primary-hover);
+    background: var(--color-primary-light);
+    border: 1px solid #BBF7D0;
+    padding: 2px 8px;
+    border-radius: 9999px;
+  }
+
+  .counter-sparkle {
+    color: #F59E0B;
+    font-size: 11px;
+  }
+
+  .showcase-subtitle {
+    font-size: 13px;
+    color: var(--color-text-secondary);
+    margin: 0;
+  }
+
+  /* Carousel Navigation Buttons */
+  .carousel-nav-btns {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .btn-carousel-nav {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: var(--color-surface-subtle);
+    border: 1px solid var(--color-border);
+    color: var(--color-text);
+    font-size: 18px;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    user-select: none;
+    line-height: 1;
+  }
+
+  .btn-carousel-nav:hover {
+    background: #EFEFEA;
+    border-color: #C8C7BF;
+    transform: scale(1.05);
+  }
+
+  /* Filter Bar */
+  .badge-filter-bar {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    overflow-x: auto;
+    padding-bottom: 4px;
+    scrollbar-width: none;
+  }
+
+  .badge-filter-bar::-webkit-scrollbar {
+    display: none;
+  }
+
+  .filter-divider {
+    width: 1px;
+    height: 18px;
+    background: var(--color-border-subtle);
+    margin: 0 4px;
+    flex-shrink: 0;
+  }
+
+  .badge-filter-pill {
+    padding: 4px 10px;
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--color-text-secondary);
+    background: var(--color-surface-subtle);
+    border: 1px solid var(--color-border-subtle);
+    border-radius: 9999px;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: all 0.12s ease;
+    flex-shrink: 0;
+  }
+
+  .badge-filter-pill:hover {
+    color: var(--color-text);
+    border-color: var(--color-border);
+  }
+
+  .badge-filter-pill.active {
+    background: var(--color-text);
+    color: #FFFFFF;
+    border-color: var(--color-text);
+    font-weight: 600;
+  }
+
+  /* Horizontal Carousel Container */
+  .badges-carousel-container {
+    display: flex;
+    align-items: flex-start;
+    gap: 22px;
+    overflow-x: auto;
+    scroll-behavior: smooth;
+    scroll-snap-type: x mandatory;
+    padding: 12px 6px 16px 6px;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: thin;
+    scrollbar-color: #D1D5DB transparent;
+  }
+
+  .badges-carousel-container::-webkit-scrollbar {
+    height: 6px;
+  }
+
+  .badges-carousel-container::-webkit-scrollbar-thumb {
+    background: #D1D5DB;
+    border-radius: 3px;
+  }
+
+  /* Individual Badge Item Card */
+  .badge-item-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+    width: 96px;
+    flex-shrink: 0;
+    scroll-snap-align: start;
+    cursor: pointer;
+    outline: none;
+    transition: transform 0.18s ease;
+    user-select: none;
+  }
+
+  .badge-item-card:hover {
+    transform: translateY(-3px);
+  }
+
+  .badge-item-card:focus-visible .badge-medallion-frame {
+    outline: 2px solid var(--color-primary);
+    outline-offset: 3px;
+  }
+
+  /* Circular Medallion Frame */
+  .badge-medallion-frame {
+    position: relative;
+    width: 80px;
+    height: 80px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+  }
+
+  /* UNLOCKED BADGE: 3D Gold Ring */
+  .badge-unlocked .badge-medallion-frame {
+    background: linear-gradient(135deg, #FDE68A 0%, #F59E0B 50%, #D97706 100%);
+    box-shadow: 0 6px 16px rgba(245, 158, 11, 0.28), inset 0 2px 3px rgba(255, 255, 255, 0.8);
+    padding: 3.5px;
+  }
+
+  .badge-unlocked .badge-medallion-inner {
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.25);
+  }
+
+  .badge-unlocked .badge-svg-emblem {
+    width: 100%;
+    height: 100%;
+    filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.15));
+  }
+
+  /* LOCKED BADGE: Faded Greyish Silhouette */
+  .badge-locked .badge-medallion-frame {
+    background: #E5E7EB;
+    box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.08);
+    padding: 3.5px;
+  }
+
+  .badge-locked .badge-medallion-inner {
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    background: #F3F4F6;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .badge-locked .badge-svg-emblem {
+    width: 100%;
+    height: 100%;
+    filter: grayscale(1) opacity(0.38);
+  }
+
+  /* Badge Typography & Subtitles */
+  .badge-card-info {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    gap: 3px;
+    width: 100%;
+  }
+
+  .badge-title {
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--color-text);
+    line-height: 1.25;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    min-height: 30px;
+  }
+
+  .badge-locked .badge-title {
+    color: var(--color-text-secondary);
+  }
+
+  .badge-subtitle {
+    font-size: 11px;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .date-unlocked {
+    color: var(--color-text-secondary);
+    font-weight: 500;
+  }
+
+  .badge-locked-progress-box {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 3px;
+    width: 100%;
+  }
+
+  .progress-ratio {
+    color: var(--color-muted);
+    font-size: 10.5px;
+    white-space: nowrap;
+  }
+
+  /* Progress Bar for Locked Badges */
+  .badge-progress-track {
+    width: 52px;
+    height: 4px;
+    background: #E5E7EB;
+    border-radius: 2px;
+    overflow: hidden;
+  }
+
+  .badge-progress-fill {
+    height: 100%;
+    background: #EA580C; /* Vibrant Orange accent matching reference */
+    border-radius: 2px;
+    transition: width 0.3s ease;
+  }
+
+  /* Detail Popover / Modal */
+  .badge-modal-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 1300;
+    background: rgba(15, 23, 42, 0.4);
+    backdrop-filter: blur(2px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+  }
+
+  .badge-detail-card {
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-panel);
+    box-shadow: var(--shadow-lg);
+    width: 100%;
+    max-width: 320px;
+    padding: 24px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    gap: 14px;
+    position: relative;
+    animation: modalPop 0.15s ease-out;
+  }
+
+  @keyframes modalPop {
+    from { opacity: 0; transform: scale(0.95); }
+    to { opacity: 1; transform: scale(1); }
+  }
+
+  .btn-badge-modal-close {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    background: transparent;
+    border: none;
+    color: var(--color-muted);
+    font-size: 14px;
+    padding: 4px 6px;
+    cursor: pointer;
+    border-radius: 4px;
+  }
+
+  .btn-badge-modal-close:hover {
+    color: var(--color-text);
+    background: var(--color-surface-hover);
+  }
+
+  .modal-badge-icon-wrap {
+    width: 88px;
+    height: 88px;
+    margin-top: 4px;
+  }
+
+  .modal-badge-body {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    width: 100%;
+  }
+
+  .modal-category-tag {
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--color-text-secondary);
+    background: var(--color-surface-subtle);
+    padding: 2px 8px;
+    border-radius: 4px;
+  }
+
+  .modal-badge-title {
+    font-size: 17px;
+    font-weight: 700;
+    color: var(--color-text);
+    margin: 0;
+  }
+
+  .modal-badge-desc {
+    font-size: 13px;
+    color: var(--color-text-secondary);
+    line-height: 1.45;
+    margin: 0;
+  }
+
+  .modal-badge-status-box {
+    width: 100%;
+    margin-top: 8px;
+  }
+
+  :global(.modal-status-earned) {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--color-primary-hover);
+    background: var(--color-primary-light);
+    border: 1px solid #BBF7D0;
+    padding: 6px 12px;
+    border-radius: var(--radius-sm);
+    width: 100%;
+    justify-content: center;
+  }
+
+  :global(.modal-status-locked-wrap) {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    background: var(--color-surface-subtle);
+    border: 1px solid var(--color-border);
+    padding: 10px 12px;
+    border-radius: var(--radius-sm);
+    width: 100%;
+    box-sizing: border-box;
+  }
+
+  :global(.modal-locked-text-row) {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: 12px;
+  }
+
+  :global(.modal-locked-label) {
+    font-weight: 600;
+    color: var(--color-text-secondary);
+  }
+
+  :global(.modal-locked-val) {
+    font-weight: 700;
+    color: var(--color-text);
+  }
+
+  :global(.modal-full-progress-track) {
+    width: 100%;
+    height: 6px;
+    background: #E5E7EB;
+    border-radius: 3px;
+    overflow: hidden;
+  }
+
+  :global(.modal-full-progress-fill) {
+    height: 100%;
+    background: #EA580C;
+    border-radius: 3px;
+  }
+</style>
+
+<script>
+  const container = document.getElementById('badges-carousel-track');
+  const btnPrev = document.getElementById('btn-badge-carousel-prev');
+  const btnNext = document.getElementById('btn-badge-carousel-next');
+  const filterPills = document.querySelectorAll('.badge-filter-pill');
+  const badgeCards = document.querySelectorAll('.badge-item-card');
+
+  // Horizontal Carousel Scrolling
+  if (container && btnPrev && btnNext) {
+    btnPrev.addEventListener('click', () => {
+      container.scrollBy({ left: -220, behavior: 'smooth' });
+    });
+
+    btnNext.addEventListener('click', () => {
+      container.scrollBy({ left: 220, behavior: 'smooth' });
+    });
+  }
+
+  // Category & Status Filtering
+  filterPills.forEach((pill) => {
+    pill.addEventListener('click', () => {
+      filterPills.forEach((p) => p.classList.remove('active'));
+      pill.classList.add('active');
+
+      const cat = (pill as HTMLElement).dataset.category || 'all';
+
+      badgeCards.forEach((card) => {
+        const el = card as HTMLElement;
+        const cardCategory = el.dataset.category || '';
+        const cardStatus = el.dataset.status || '';
+
+        if (cat === 'all') {
+          el.style.display = 'flex';
+        } else if (cat === 'earned') {
+          el.style.display = cardStatus === 'earned' ? 'flex' : 'none';
+        } else if (cat === 'locked') {
+          el.style.display = cardStatus === 'locked' ? 'flex' : 'none';
+        } else {
+          el.style.display = cardCategory === cat ? 'flex' : 'none';
+        }
+      });
+    });
+  });
+
+  // Modal Interaction
+  const modalOverlay = document.getElementById('badge-detail-modal');
+  const modalCloseBtn = document.getElementById('btn-close-badge-modal');
+  const modalIconTarget = document.getElementById('modal-badge-icon-target');
+  const modalCategory = document.getElementById('modal-badge-category');
+  const modalTitle = document.getElementById('modal-badge-title');
+  const modalDesc = document.getElementById('modal-badge-desc');
+  const modalStatusBox = document.getElementById('modal-badge-status-box');
+
+  function openBadgeModal(card: HTMLElement) {
+    if (!modalOverlay || !modalIconTarget || !modalCategory || !modalTitle || !modalDesc || !modalStatusBox) return;
+
+    const isEarned = card.dataset.status === 'earned';
+    const title = card.dataset.title || '';
+    const desc = card.dataset.desc || '';
+    const category = card.dataset.category || '';
+    const date = card.dataset.date || '';
+    const progressText = card.dataset.progressText || '';
+    const percent = card.dataset.percent || '0';
+
+    modalCategory.textContent = category;
+    modalTitle.textContent = title;
+    modalDesc.textContent = desc;
+
+    // Clone medallion visual
+    const medallion = card.querySelector('.badge-medallion-frame');
+    if (medallion) {
+      modalIconTarget.innerHTML = medallion.outerHTML;
+    }
+
+    if (isEarned) {
+      modalStatusBox.innerHTML = `
+        <div class="modal-status-earned">
+          <span>✓</span>
+          <span>Earned on ${date}</span>
+        </div>
+      `;
+    } else {
+      modalStatusBox.innerHTML = `
+        <div class="modal-status-locked-wrap">
+          <div class="modal-locked-text-row">
+            <span class="modal-locked-label">Current Progress:</span>
+            <span class="modal-locked-val">${progressText} (${percent}%)</span>
+          </div>
+          <div class="modal-full-progress-track">
+            <div class="modal-full-progress-fill" style="width: ${percent}%;"></div>
+          </div>
+        </div>
+      `;
+    }
+
+    modalOverlay.style.display = 'flex';
+  }
+
+  function closeBadgeModal() {
+    if (modalOverlay) {
+      modalOverlay.style.display = 'none';
+    }
+  }
+
+  badgeCards.forEach((card) => {
+    const el = card as HTMLElement;
+    el.addEventListener('click', () => openBadgeModal(el));
+    el.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        openBadgeModal(el);
+      }
+    });
+  });
+
+  if (modalCloseBtn) {
+    modalCloseBtn.addEventListener('click', closeBadgeModal);
+  }
+
+  if (modalOverlay) {
+    modalOverlay.addEventListener('click', (e) => {
+      if (e.target === modalOverlay) {
+        closeBadgeModal();
+      }
+    });
+  }
+
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && modalOverlay && modalOverlay.style.display !== 'none') {
+      closeBadgeModal();
+    }
+  });
+</script>

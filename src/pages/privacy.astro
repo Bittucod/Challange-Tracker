@@ -1,0 +1,184 @@
+---
+import Layout from '../layouts/Layout.astro';
+---
+
+<Layout
+  title="Privacy Policy — StreakGrid"
+  description="How StreakGrid protects your personal tracking data and financial transaction history."
+>
+  <div class="legal-page-layout">
+    <header class="legal-header">
+      <div class="legal-header-inner">
+        <a href="/" class="brand-link">
+          <div class="brand-badge">✓</div>
+          <span class="brand-name">StreakGrid</span>
+        </a>
+        <a href="/" class="btn btn-secondary btn-sm">Return Home</a>
+      </div>
+    </header>
+
+    <main class="legal-content-container">
+      <div class="legal-doc-card">
+        <div class="doc-header">
+          <span class="doc-tag">Privacy & Security</span>
+          <h1 class="doc-title">Privacy Policy</h1>
+          <span class="doc-date">Effective Date: September 2026</span>
+        </div>
+
+        <div class="doc-body">
+          <section class="doc-section">
+            <h2>1. Our Privacy First Principle</h2>
+            <p>
+              Your challenge tracking data is completely private by default. Challenges are never broadcast to the community or published online unless you explicitly choose to toggle visibility to <em>Community</em> or <em>Public</em>.
+            </p>
+          </section>
+
+          <section class="doc-section">
+            <h2>2. Financial Data & Security</h2>
+            <p>
+              StreakGrid does <strong>never</strong> store raw credit card numbers, bank credentials, or CVVs on our servers. All monetary transactions are processed through certified, PCI-DSS-compliant payment providers via encrypted tokenization.
+            </p>
+            <p>
+              We maintain an immutable ledger of transaction IDs, currency, and amount records strictly for audit verification, fraud prevention, and accounting transparency.
+            </p>
+          </section>
+
+          <section class="doc-section">
+            <h2>3. Information We Collect</h2>
+            <ul>
+              <li><strong>Account Info:</strong> Name, email address, password hash (salted using scrypt).</li>
+              <li><strong>Challenge Tracking:</strong> Challenge names, activities, daily statuses (completed, missed, pending, exempt), and optional cell notes.</li>
+              <li><strong>Stakes & Verification:</strong> Escrow commitment references, proof links submitted by you, and dispute documentation.</li>
+            </ul>
+          </section>
+
+          <section class="doc-section">
+            <h2>4. Public Controls & Disclosures</h2>
+            <p>
+              Even on publicly shared challenges, you have full control to hide or display your exact stake commitment amount. You may disable comments at any time from your challenge settings.
+            </p>
+          </section>
+        </div>
+      </div>
+    </main>
+  </div>
+</Layout>
+
+<style>
+  .legal-page-layout {
+    min-height: 100vh;
+    background: var(--color-bg);
+    display: flex;
+    flex-direction: column;
+  }
+
+  .legal-header {
+    background: var(--color-surface);
+    border-bottom: 1px solid var(--color-border);
+    padding: 12px 20px;
+  }
+
+  .legal-header-inner {
+    max-width: 860px;
+    margin: 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .brand-link {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-weight: 700;
+    font-size: 16px;
+    color: var(--color-text);
+  }
+
+  .brand-badge {
+    width: 24px;
+    height: 24px;
+    background: var(--color-primary);
+    border-radius: 5px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #FFFFFF;
+    font-weight: 800;
+    font-size: 14px;
+  }
+
+  .legal-content-container {
+    max-width: 860px;
+    width: 100%;
+    margin: 30px auto 80px auto;
+    padding: 0 20px;
+  }
+
+  .legal-doc-card {
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-modal);
+    padding: 40px 36px;
+    box-shadow: var(--shadow-sm);
+    display: flex;
+    flex-direction: column;
+    gap: 28px;
+  }
+
+  .doc-header {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    border-bottom: 1px solid var(--color-border-subtle);
+    padding-bottom: 20px;
+  }
+
+  .doc-tag {
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--color-primary-hover);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+
+  .doc-title {
+    font-size: 28px;
+    font-weight: 800;
+    color: var(--color-text);
+    letter-spacing: -0.02em;
+  }
+
+  .doc-date {
+    font-size: 13px;
+    color: var(--color-muted);
+  }
+
+  .doc-body {
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+    line-height: 1.6;
+    font-size: 14px;
+    color: var(--color-text);
+  }
+
+  .doc-section {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .doc-section h2 {
+    font-size: 17px;
+    font-weight: 700;
+    color: var(--color-text);
+  }
+
+  .doc-section ul {
+    margin-left: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+</style>

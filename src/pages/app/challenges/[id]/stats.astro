@@ -1,0 +1,366 @@
+---
+import AppLayout from '../../../../layouts/AppLayout.astro';
+import StreakBanner from '../../../../components/StreakBanner.astro';
+import Heatmap from '../../../../components/Heatmap.astro';
+import Icons from '../../../../components/Icons.astro';
+import ShareCardModal from '../../../../components/ShareCardModal.astro';
+import { getUserFromCookies } from '../../../../lib/auth';
+import { db } from '../../../../lib/db';
+import { calculateChallengeAnalytics } from '../../../../lib/engine';
+import type { Challenge, Activity, DailyRecord, Milestone } from '../../../../lib/types';
+
+const user = getUserFromCookies(Astro.cookies);
+if (!user) {
+  return Astro.redirect('/login');
+}
+
+const { id } = Astro.params;
+if (!id) {
+  return Astro.redirect('/app');
+}
+
+const challenge = db
+  .prepare('SELECT * FROM challenges WHERE id = ? AND user_id = ?')
+  .get(id, user.id) as Challenge | undefined;
+
+if (!challenge) {
+  return Astro.redirect('/app');
+}
+
+const activities = db
+  .prepare('SELECT * FROM activities WHERE challenge_id = ? ORDER BY sort_order ASC')
+  .all(id) as Activity[];
+
+const records = db
+  .prepare('SELECT * FROM daily_records WHERE challenge_id = ?')
+  .all(id) as DailyRecord[];
+
+const milestones = db
+  .prepare('SELECT * FROM milestones WHERE challenge_id = ? ORDER BY target_days ASC')
+  .all(id) as Milestone[];
+
+const analytics = calculateChallengeAnalytics(challenge, activities, records);
+---
+
+<AppLayout title={`${challenge.name} Stats — StreakGrid`} activeChallengeId={challenge.id}>
+  <div class="stats-page-view">
+    <StreakBanner
+      challenge={challenge}
+      analytics={analytics}
+      activeTab="stats"
+    />
+
+    <!-- Quick Stat Numbers Grid -->
+    <div class="stats-metrics-grid">
+      <div class="stat-box">
+        <span class="stat-box-label">Current Streak</span>
+        <div class="stat-box-num streak-color">🔥 {analytics.currentStreak} <span class="stat-unit">days</span></div>
+        <span class="stat-box-sub">Longest: {analytics.longestStreak} days</span>
+      </div>
+
+      <div class="stat-box">
+        <span class="stat-box-label">Successful Days</span>
+        <div class="stat-box-num green-color">✓ {analytics.totalSuccessfulDays} <span class="stat-unit">days</span></div>
+        <span class="stat-box-sub">{analytics.perfectDays} perfect days</span>
+      </div>
+
+      <div class="stat-box">
+        <span class="stat-box-label">Consistency Rate</span>
+        <div class="stat-box-num">{analytics.completionPercentage}%</div>
+        <span class="stat-box-sub">Elapsed: {analytics.elapsedDays} / {analytics.totalDays}</span>
+      </div>
+
+      <div class="stat-box">
+        <span class="stat-box-label">Total Activities</span>
+        <div class="stat-box-num">{analytics.totalCompletedActivities}</div>
+        <span class="stat-box-sub">Avg {analytics.avgActivitiesPerActiveDay} / day</span>
+      </div>
+    </div>
+
+    <!-- GitHub Contribution Style Consistency Heatmap -->
+    <section class="stats-section">
+      <Heatmap heatmap={analytics.heatmap} />
+    </section>
+
+    <!-- Activity Level Breakdown -->
+    <section class="stats-section">
+      <div class="section-title-wrap">
+        <h2 class="sub-heading">Activity Breakdown</h2>
+        <span class="sub-desc">Consistency performance per activity</span>
+      </div>
+
+      <div class="activity-breakdown-list">
+        {analytics.activityStats.map((stat) => (
+          <div class="act-stat-card">
+            <div class="act-stat-left">
+              <div class="act-icon-box">
+                <Icons name={stat.activity.icon} size={18} />
+              </div>
+              <div class="act-info">
+                <span class="act-name">{stat.activity.name}</span>
+                <span class="act-sub">{stat.completedDays} of {stat.applicableDays} days completed</span>
+              </div>
+            </div>
+
+            <div class="act-stat-right">
+              <div class="act-rate-wrap">
+                <span class="act-rate">{stat.completionRate}%</span>
+                <div class="rate-progress-bar">
+                  <div class="rate-fill" style={`width: ${stat.completionRate}%`}></div>
+                </div>
+              </div>
+              <span class="act-streak-badge">🔥 {stat.currentStreak}d</span>
+            </div>
+          </div>
+        ))}
+      </div>
+    </section>
+
+    <!-- Milestones Progress -->
+    <section class="stats-section">
+      <div class="section-title-wrap">
+        <h2 class="sub-heading">Milestone Progression</h2>
+        <span class="sub-desc">Key consistency checkpoints</span>
+      </div>
+
+      <div class="milestones-row">
+        {milestones.map((m) => {
+          const isReached = analytics.currentStreak >= m.target_days || m.reached;
+          return (
+            <div class={`milestone-badge-box ${isReached ? 'reached' : 'locked'}`}>
+              <span class="m-icon">{isReached ? '🏆' : '🔒'}</span>
+              <span class="m-target">{m.target_days} Days</span>
+              <span class="m-status">{isReached ? 'Reached' : 'In Progress'}</span>
+            </div>
+          );
+        })}
+      </div>
+    </section>
+
+    <!-- Share Card Modal -->
+    <ShareCardModal
+      challenge={challenge}
+      activities={activities}
+      analytics={analytics}
+    />
+  </div>
+</AppLayout>
+
+<style>
+  .stats-page-view {
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+  }
+
+  .stats-metrics-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 14px;
+  }
+
+  .stat-box {
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-panel);
+    padding: 18px 16px;
+    box-shadow: var(--shadow-sm);
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .stat-box-label {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--color-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+
+  .stat-box-num {
+    font-size: 26px;
+    font-weight: 800;
+    color: var(--color-text);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .streak-color {
+    color: var(--color-streak-hover);
+  }
+
+  .green-color {
+    color: var(--color-primary-hover);
+  }
+
+  .stat-unit {
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--color-muted);
+  }
+
+  .stat-box-sub {
+    font-size: 12px;
+    color: var(--color-text-secondary);
+  }
+
+  .stats-section {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+
+  .section-title-wrap {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .sub-heading {
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--color-text);
+  }
+
+  .sub-desc {
+    font-size: 12px;
+    color: var(--color-muted);
+  }
+
+  .activity-breakdown-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 12px;
+  }
+
+  .act-stat-card {
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-panel);
+    padding: 14px;
+    box-shadow: var(--shadow-sm);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+  }
+
+  .act-stat-left {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .act-icon-box {
+    width: 34px;
+    height: 34px;
+    border-radius: 7px;
+    background: var(--color-surface-subtle);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--color-text-secondary);
+  }
+
+  .act-info {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .act-name {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--color-text);
+  }
+
+  .act-sub {
+    font-size: 11px;
+    color: var(--color-muted);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .act-stat-right {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .act-rate-wrap {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 4px;
+  }
+
+  .act-rate {
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--color-text);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .rate-progress-bar {
+    width: 60px;
+    height: 5px;
+    border-radius: 3px;
+    background: #EFEFEA;
+    overflow: hidden;
+  }
+
+  .rate-fill {
+    height: 100%;
+    background: var(--color-primary);
+    border-radius: 3px;
+  }
+
+  .act-streak-badge {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--color-streak-hover);
+    background: var(--color-streak-soft);
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Milestones */
+  .milestones-row {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+
+  .milestone-badge-box {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    padding: 12px 18px;
+    border-radius: var(--radius-panel);
+    border: 1px solid var(--color-border);
+    background: var(--color-surface);
+    min-width: 100px;
+    box-shadow: var(--shadow-sm);
+  }
+
+  .milestone-badge-box.reached {
+    border-color: rgba(34, 197, 94, 0.4);
+    background: #F3FAF5;
+  }
+
+  .m-icon {
+    font-size: 20px;
+  }
+
+  .m-target {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--color-text);
+  }
+
+  .m-status {
+    font-size: 10px;
+    color: var(--color-muted);
+    font-weight: 500;
+  }
+</style>

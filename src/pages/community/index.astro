@@ -1,0 +1,555 @@
+---
+import Layout from '../../layouts/Layout.astro';
+import Icons from '../../components/Icons.astro';
+import StakeBadge from '../../components/StakeBadge.astro';
+import { getUserFromCookies } from '../../lib/auth';
+import { db } from '../../lib/db';
+import { calculateChallengeAnalytics } from '../../lib/engine';
+import { getChallengeStakeCommitment } from '../../lib/stakes';
+import type { Challenge, Activity, DailyRecord, User } from '../../lib/types';
+
+const currentUser = getUserFromCookies(Astro.cookies);
+
+// Query all community-visible challenges
+const rawChallenges = db
+  .prepare(`
+    SELECT c.*, u.name as creator_name, u.email as creator_email, u.avatar_url as creator_avatar
+    FROM challenges c
+    JOIN users u ON c.user_id = u.id
+    WHERE c.visibility IN ('community', 'public') AND c.is_archived = 0
+    ORDER BY c.updated_at DESC
+  `)
+  .all() as Array<Challenge & { creator_name: string; creator_email: string; creator_avatar?: string }>;
+
+const communityCards = rawChallenges.map((c) => {
+  const activities = db
+    .prepare('SELECT * FROM activities WHERE challenge_id = ? ORDER BY sort_order ASC')
+    .all(c.id) as Activity[];
+  const records = db
+    .prepare('SELECT * FROM daily_records WHERE challenge_id = ?')
+    .all(c.id) as DailyRecord[];
+
+  const analytics = calculateChallengeAnalytics(c, activities, records);
+  const commitment = getChallengeStakeCommitment(c.id);
+
+  const commentsCount = (
+    db.prepare("SELECT COUNT(*) as count FROM comments WHERE challenge_id = ? AND status = 'active'").get(c.id) as { count: number }
+  ).count;
+
+  const reactionsCount = (
+    db.prepare('SELECT COUNT(*) as count FROM reactions WHERE challenge_id = ?').get(c.id) as { count: number }
+  ).count;
+
+  return {
+    challenge: c,
+    analytics,
+    commitment,
+    commentsCount,
+    reactionsCount
+  };
+});
+---
+
+<Layout
+  title="Community Accountability Feed — StreakGrid"
+  description="See ambitious people committing to 30, 50, and 100-day challenges. Watch streaks grow, progress happen, and stakes honored."
+>
+  <div class="community-page-view">
+    <!-- Top Nav Header -->
+    <header class="community-header">
+      <div class="header-inner">
+        <a href="/" class="brand-link">
+          <div class="brand-badge">✓</div>
+          <span class="brand-title">StreakGrid</span>
+        </a>
+
+        <div class="header-nav-links">
+          <a href="/community" class="nav-item active">Community</a>
+          {currentUser ? (
+            <>
+              <a href="/app" class="nav-item">My Challenges</a>
+              <a href="/app/commitments" class="nav-item">Commitments</a>
+              <a href="/app/profile" class="nav-item">Profile</a>
+            </>
+          ) : (
+            <>
+              <a href="/login" class="btn btn-secondary btn-sm">Sign In</a>
+              <a href="/signup" class="btn btn-primary btn-sm">Start Challenge</a>
+            </>
+          )}
+        </div>
+      </div>
+    </header>
+
+    <!-- Main Community Feed Content -->
+    <main class="community-main">
+      <div class="community-hero">
+        <div class="community-pill">
+          <span>Social Accountability</span>
+        </div>
+        <h1 class="community-headline">Watch commitments turn into completed goals.</h1>
+        <p class="community-sub">
+          «See people committing to challenges and watch them progress day by day.»
+        </p>
+
+        <!-- Discovery Filter Pills -->
+        <div class="discovery-filter-bar">
+          <button class="filter-btn active" data-filter="all">All Challenges</button>
+          <button class="filter-btn" data-filter="stakes">🔥 Stakes Only</button>
+          <button class="filter-btn" data-filter="active">In Progress</button>
+          <button class="filter-btn" data-filter="near">Near Completion</button>
+          <button class="filter-btn" data-filter="completed">Completed</button>
+        </div>
+      </div>
+
+      <!-- Feed Grid / List -->
+      <div class="challenges-feed" id="challenges-feed">
+        {communityCards.length === 0 ? (
+          <div class="empty-feed-card">
+            <div class="empty-icon-pill">🌱</div>
+            <h3>Be the first to share a challenge</h3>
+            <p>Make your challenge visible to the community to invite peer accountability and encouragement.</p>
+            <a href="/app/challenges/new" class="btn btn-primary btn-sm">Create Challenge</a>
+          </div>
+        ) : (
+          communityCards.map(({ challenge, analytics, commitment, commentsCount, reactionsCount }) => {
+            const isCompleted = analytics.currentDayNumber >= challenge.duration && analytics.completionPercentage >= 80;
+            const isNear = analytics.currentDayNumber >= Math.floor(challenge.duration * 0.75) && !isCompleted;
+            const isStaked = challenge.challenge_type === 'stake' || Boolean(commitment);
+
+            let filterTags = ['all'];
+            if (isStaked) filterTags.push('stakes');
+            if (isCompleted) filterTags.push('completed');
+            if (isNear) filterTags.push('near');
+            if (!isCompleted) filterTags.push('active');
+
+            const initial = challenge.creator_name ? challenge.creator_name.charAt(0).toUpperCase() : 'U';
+
+            return (
+              <article class="feed-card" data-tags={filterTags.join(' ')}>
+                <div class="card-header">
+                  <div class="creator-area">
+                    <div class="avatar-circle">
+                      {challenge.creator_avatar ? (
+                        <img src={challenge.creator_avatar} alt={challenge.creator_name} class="avatar-img" />
+                      ) : (
+                        <span>{initial}</span>
+                      )}
+                    </div>
+                    <div class="creator-details">
+                      <span class="creator-name">{challenge.creator_name}</span>
+                      <span class="challenge-type-label">
+                        {isStaked ? 'Stake Challenge' : 'Free Challenge'}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div class="card-badges">
+                    {isStaked && (
+                      <StakeBadge
+                        commitment={commitment}
+                        challengeType={challenge.challenge_type}
+                        showAmount={Boolean(challenge.show_stake_amount)}
+                      />
+                    )}
+                    <span class="badge badge-streak">
+                      🔥 {analytics.currentStreak}d streak
+                    </span>
+                  </div>
+                </div>
+
+                <div class="card-body">
+                  <h2 class="card-title">
+                    <a href={`/challenge/${challenge.id}`}>{challenge.name}</a>
+                  </h2>
+
+                  {challenge.description && (
+                    <p class="card-desc">{challenge.description}</p>
+                  )}
+
+                  <!-- Progress Bar -->
+                  <div class="card-progress-wrap">
+                    <div class="progress-meta">
+                      <span class="day-tracker-text">
+                        Day <strong>{analytics.currentDayNumber}</strong> of {challenge.duration}
+                      </span>
+                      <span class="consistency-text">
+                        {analytics.completionPercentage}% consistency
+                      </span>
+                    </div>
+                    <div class="progress-track">
+                      <div
+                        class="progress-fill"
+                        style={`width: ${Math.min(100, Math.round((analytics.currentDayNumber / challenge.duration) * 100))}%`}
+                      ></div>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="card-footer">
+                  <div class="social-counters">
+                    <span class="counter-item" title="Reactions">
+                      🔥 {reactionsCount}
+                    </span>
+                    <span class="counter-item" title="Encouragement comments">
+                      💬 {commentsCount}
+                    </span>
+                  </div>
+
+                  <a href={`/challenge/${challenge.id}`} class="btn btn-secondary btn-sm view-challenge-btn">
+                    <span>View Challenge</span>
+                    <Icons name="arrow-right" size={13} />
+                  </a>
+                </div>
+              </article>
+            );
+          })
+        )}
+      </div>
+    </main>
+  </div>
+</Layout>
+
+<style>
+  .community-page-view {
+    min-height: 100vh;
+    background: var(--color-bg);
+    display: flex;
+    flex-direction: column;
+  }
+
+  .community-header {
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    background: rgba(250, 250, 247, 0.94);
+    backdrop-filter: blur(8px);
+    border-bottom: 1px solid var(--color-border);
+  }
+
+  .header-inner {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 12px 20px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+  }
+
+  .brand-link {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-weight: 700;
+    font-size: 16px;
+    color: var(--color-text);
+  }
+
+  .brand-badge {
+    width: 26px;
+    height: 26px;
+    background: var(--color-primary);
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #FFFFFF;
+    font-weight: 800;
+    font-size: 15px;
+  }
+
+  .header-nav-links {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+  }
+
+  .nav-item {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--color-text-secondary);
+    padding: 4px 8px;
+    border-radius: var(--radius-sm);
+    transition: all 0.1s ease;
+  }
+
+  .nav-item:hover,
+  .nav-item.active {
+    color: var(--color-text);
+    background: var(--color-surface-hover);
+  }
+
+  .community-main {
+    max-width: 840px;
+    width: 100%;
+    margin: 0 auto;
+    padding: 32px 20px 80px 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+  }
+
+  .community-hero {
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .community-pill {
+    padding: 3px 10px;
+    border-radius: 20px;
+    background: var(--color-primary-light);
+    color: var(--color-primary-hover);
+    font-size: 12px;
+    font-weight: 600;
+  }
+
+  .community-headline {
+    font-size: 28px;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    color: var(--color-text);
+  }
+
+  .community-sub {
+    font-size: 14px;
+    color: var(--color-muted);
+    max-width: 480px;
+  }
+
+  .discovery-filter-bar {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    flex-wrap: wrap;
+    margin-top: 14px;
+  }
+
+  .filter-btn {
+    padding: 5px 12px;
+    border-radius: 20px;
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--color-text-secondary);
+    transition: all 0.1s ease;
+  }
+
+  .filter-btn:hover {
+    background: var(--color-surface-hover);
+    color: var(--color-text);
+  }
+
+  .filter-btn.active {
+    background: var(--color-text);
+    color: #FFFFFF;
+    border-color: var(--color-text);
+  }
+
+  /* Challenges Feed */
+  .challenges-feed {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .feed-card {
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-panel);
+    padding: 20px 22px;
+    box-shadow: var(--shadow-sm);
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    transition: transform 0.12s ease, box-shadow 0.12s ease;
+  }
+
+  .feed-card:hover {
+    transform: translateY(-1px);
+    box-shadow: var(--shadow-md);
+  }
+
+  .card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+
+  .creator-area {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .avatar-circle {
+    width: 34px;
+    height: 34px;
+    border-radius: 50%;
+    background: var(--color-surface-subtle);
+    border: 1px solid var(--color-border);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--color-text);
+    overflow: hidden;
+  }
+
+  .avatar-img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  .creator-details {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .creator-name {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--color-text);
+  }
+
+  .challenge-type-label {
+    font-size: 11px;
+    color: var(--color-muted);
+  }
+
+  .card-badges {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .card-body {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .card-title {
+    font-size: 17px;
+    font-weight: 700;
+  }
+
+  .card-title a {
+    color: var(--color-text);
+  }
+
+  .card-title a:hover {
+    color: var(--color-primary-hover);
+  }
+
+  .card-desc {
+    font-size: 13px;
+    color: var(--color-text-secondary);
+    line-height: 1.4;
+  }
+
+  .card-progress-wrap {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-top: 4px;
+  }
+
+  .progress-meta {
+    display: flex;
+    justify-content: space-between;
+    font-size: 12px;
+  }
+
+  .day-tracker-text {
+    color: var(--color-text);
+  }
+
+  .consistency-text {
+    color: var(--color-primary-hover);
+    font-weight: 500;
+  }
+
+  .progress-track {
+    width: 100%;
+    height: 7px;
+    background: var(--color-surface-subtle);
+    border-radius: 4px;
+    overflow: hidden;
+  }
+
+  .progress-fill {
+    height: 100%;
+    background: var(--color-primary);
+    border-radius: 4px;
+  }
+
+  .card-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding-top: 10px;
+    border-top: 1px solid var(--color-border-subtle);
+  }
+
+  .social-counters {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-size: 12px;
+    color: var(--color-muted);
+  }
+
+  .view-challenge-btn {
+    font-size: 12px;
+    padding: 5px 10px;
+  }
+
+  .empty-feed-card {
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-modal);
+    padding: 60px 24px;
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .empty-icon-pill {
+    font-size: 28px;
+  }
+</style>
+
+<script>
+  const filterBtns = document.querySelectorAll('.filter-btn');
+  const feedCards = document.querySelectorAll('.feed-card');
+
+  filterBtns.forEach((btn) => {
+    btn.addEventListener('click', () => {
+      filterBtns.forEach((b) => b.classList.remove('active'));
+      btn.classList.add('active');
+
+      const filter = (btn as HTMLElement).dataset.filter || 'all';
+
+      feedCards.forEach((card) => {
+        const tags = (card as HTMLElement).dataset.tags || '';
+        if (filter === 'all' || tags.includes(filter)) {
+          (card as HTMLElement).style.display = 'flex';
+        } else {
+          (card as HTMLElement).style.display = 'none';
+        }
+      });
+    });
+  });
+</script>

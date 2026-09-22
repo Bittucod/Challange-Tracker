@@ -1,0 +1,183 @@
+---
+import Icons from './Icons.astro';
+import StakeBadge from './StakeBadge.astro';
+import { getChallengeStakeCommitment, getRemainingDays } from '../lib/stakes';
+import type { Challenge, ChallengeAnalytics } from '../lib/types';
+
+interface Props {
+  challenge: Challenge;
+  analytics: ChallengeAnalytics;
+  activeTab?: 'tracker' | 'stats' | 'settings';
+}
+
+const { challenge, analytics, activeTab = 'tracker' } = Astro.props;
+
+const commitment = getChallengeStakeCommitment(challenge.id);
+const remainingDays = getRemainingDays(challenge.end_date);
+const isStake = challenge.challenge_type === 'stake' || Boolean(commitment);
+---
+
+<div class="streak-banner-wrap">
+  <div class="banner-top-row">
+    <div class="challenge-title-area">
+      <div class="title-meta">
+        <span class="badge badge-neutral">
+          Day {analytics.currentDayNumber} of {analytics.totalDays}
+        </span>
+        <span class="badge badge-streak" id="header-streak-badge">
+          🔥 {analytics.currentStreak} day streak
+        </span>
+        {analytics.completionPercentage > 0 && (
+          <span class="badge badge-success">
+            {analytics.completionPercentage}% consistency
+          </span>
+        )}
+        {isStake && (
+          <StakeBadge
+            commitment={commitment}
+            challengeType={challenge.challenge_type}
+            showAmount={Boolean(challenge.show_stake_amount)}
+          />
+        )}
+        {remainingDays > 0 ? (
+          <span class="badge badge-neutral countdown-badge">
+            ⏳ {remainingDays} {remainingDays === 1 ? 'day' : 'days'} remaining
+          </span>
+        ) : (
+          <span class="badge badge-neutral countdown-badge">
+            🏁 Concluded
+          </span>
+        )}
+      </div>
+      <h1 class="challenge-title">{challenge.name}</h1>
+      {challenge.description && (
+        <p class="challenge-desc">{challenge.description}</p>
+      )}
+    </div>
+
+    <div class="banner-actions">
+      {challenge.visibility && challenge.visibility !== 'private' && (
+        <a
+          href={`/challenge/${challenge.id}`}
+          class="btn btn-secondary btn-sm"
+          target="_blank"
+          title="View public accountability page"
+        >
+          <Icons name="share" size={13} />
+          <span>Public View</span>
+        </a>
+      )}
+
+      <button id="btn-open-share-card" class="btn btn-secondary btn-sm" title="Generate shareable progress card">
+        <Icons name="share" size={14} />
+        <span>Share Progress</span>
+      </button>
+
+      <button id="btn-open-invite" class="btn btn-primary btn-sm" title="Invite a friend">
+        <Icons name="plus" size={14} />
+        <span>Invite Friends</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- Navigation Tabs -->
+  <div class="banner-tabs">
+    <a href={`/app/challenges/${challenge.id}`} class={`tab-item ${activeTab === 'tracker' ? 'active' : ''}`}>
+      <Icons name="target" size={14} />
+      <span>Tracker Grid</span>
+    </a>
+    <a href={`/app/challenges/${challenge.id}/stats`} class={`tab-item ${activeTab === 'stats' ? 'active' : ''}`}>
+      <Icons name="trophy" size={14} />
+      <span>Heatmap & Stats</span>
+    </a>
+    <a href={`/app/challenges/${challenge.id}/settings`} class={`tab-item ${activeTab === 'settings' ? 'active' : ''}`}>
+      <Icons name="settings" size={14} />
+      <span>Settings</span>
+    </a>
+  </div>
+</div>
+
+<style>
+  .streak-banner-wrap {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    margin-bottom: 20px;
+    border-bottom: 1px solid var(--color-border);
+    padding-bottom: 14px;
+  }
+
+  .banner-top-row {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 16px;
+  }
+
+  .challenge-title-area {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .title-meta {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+
+  .challenge-title {
+    font-size: 26px;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    color: var(--color-text);
+  }
+
+  .challenge-desc {
+    font-size: 13px;
+    color: var(--color-muted);
+  }
+
+  .banner-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+
+  .countdown-badge {
+    color: var(--color-text-secondary);
+  }
+
+  .banner-tabs {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    border-bottom: 1px solid transparent;
+  }
+
+  .tab-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--color-text-secondary);
+    border-radius: var(--radius-sm);
+    transition: all 0.1s ease;
+  }
+
+  .tab-item:hover {
+    color: var(--color-text);
+    background: var(--color-surface-hover);
+  }
+
+  .tab-item.active {
+    color: var(--color-primary-hover);
+    background: var(--color-primary-light);
+    font-weight: 600;
+  }
+</style>

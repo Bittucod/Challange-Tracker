@@ -1,0 +1,1542 @@
+---
+import AppLayout from '../../../layouts/AppLayout.astro';
+import Icons from '../../../components/Icons.astro';
+import { getLocalTodayDateString, addDays } from '../../../lib/engine';
+import { CONFIG, SUPPORTED_CURRENCIES } from '../../../lib/config';
+
+const today = getLocalTodayDateString();
+const defaultEndDate = addDays(today, 99); // 100 days
+const stakesEnabled = CONFIG.REAL_MONEY_STAKES_ENABLED;
+const currenciesJson = JSON.stringify(SUPPORTED_CURRENCIES);
+---
+
+<AppLayout title="Create New Challenge — StreakGrid">
+  <script id="currency-configs-data" type="application/json" set:html={currenciesJson}></script>
+  <div class="create-challenge-container">
+    <div class="create-card">
+      <div class="create-header">
+        <h1 class="create-title">Create Challenge</h1>
+        <p class="create-sub">Define your goal, duration, daily activities, and commitment.</p>
+      </div>
+
+      <div id="error-alert" class="error-box" style="display: none;"></div>
+
+      <form id="create-challenge-form" class="create-form">
+        <!-- Preset Templates Selector -->
+        <div class="template-selector-box">
+          <span class="template-label">Quick Templates:</span>
+          <div class="template-chips">
+            <button type="button" class="template-chip" data-template="bip">100 Days Build in Public</button>
+            <button type="button" class="template-chip" data-template="code">50 Days of Code</button>
+            <button type="button" class="template-chip" data-template="fitness">30 Days Fitness</button>
+            <button type="button" class="template-chip" data-template="custom">Blank</button>
+          </div>
+        </div>
+
+        <!-- Challenge Type Selection -->
+        <div class="form-group">
+          <label class="form-label">Challenge Type</label>
+          <div class="challenge-type-grid">
+            <label class="type-card selected" id="type-card-free">
+              <input type="radio" name="challenge_type" value="free" checked />
+              <div class="type-card-content">
+                <div class="type-head">
+                  <span class="type-icon">✓</span>
+                  <span class="type-title">Free Challenge</span>
+                </div>
+                <p class="type-desc">Track and build your streak at your own pace with zero financial commitment.</p>
+              </div>
+            </label>
+
+            {stakesEnabled && (
+              <label class="type-card" id="type-card-stake">
+                <input type="radio" name="challenge_type" value="stake" />
+                <div class="type-card-content">
+                  <div class="type-head">
+                    <span class="type-icon-flame">🔥</span>
+                    <span class="type-title">Stake Challenge</span>
+                    <span class="type-tag">ACCOUNTABILITY</span>
+                  </div>
+                  <p class="type-desc">Put real money behind your commitment. Complete the challenge and get your stake returned.</p>
+                </div>
+              </label>
+            )}
+          </div>
+        </div>
+
+        <!-- Stake Configuration Box (Shown only if Stake is selected) -->
+        <div id="stake-config-panel" class="stake-config-panel" style="display: none;">
+          <div class="stake-panel-header">
+            <div class="stake-panel-badge">
+              <span>Accountability Deposit</span>
+            </div>
+            <h4 class="stake-panel-title">Your Stake Commitment</h4>
+            <p class="stake-panel-desc">
+              «Put real money behind your commitment. Complete the challenge according to its rules and your stake may be returned under the published terms.»
+            </p>
+          </div>
+
+          <!-- Currency and Presets -->
+          <div class="stake-inputs-grid">
+            <div class="form-group">
+              <label for="stake_currency" class="form-label">Currency</label>
+              <select id="stake_currency" name="stake_currency" class="form-input">
+                {Object.values(SUPPORTED_CURRENCIES).map((c) => (
+                  <option value={c.code} selected={c.code === CONFIG.defaultCurrency}>
+                    {c.code} ({c.symbol})
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div class="form-group">
+              <label for="stake_amount" class="form-label">Your Stake Amount</label>
+              <div class="stake-presets" id="stake-presets-container">
+                <button type="button" class="stake-preset-btn" data-amount="500">₹500</button>
+                <button type="button" class="stake-preset-btn active" data-amount="1000">₹1,000</button>
+                <button type="button" class="stake-preset-btn" data-amount="2500">₹2,500</button>
+                <button type="button" class="stake-preset-btn" data-amount="5000">₹5,000</button>
+              </div>
+              <input
+                type="number"
+                id="stake_amount"
+                name="stake_amount"
+                class="form-input stake-number-input"
+                value="1000"
+                min="100"
+                max="50000"
+                step="100"
+                placeholder="Custom amount"
+              />
+            </div>
+          </div>
+
+          <!-- Transparent Breakdown -->
+          <div class="stake-breakdown-box">
+            <div class="breakdown-row">
+              <span class="breakdown-label">Amount at risk:</span>
+              <strong id="breakdown-at-risk" class="breakdown-val">₹1,000</strong>
+            </div>
+            <div class="breakdown-row">
+              <span class="breakdown-label">Platform fee:</span>
+              <span id="breakdown-fee" class="breakdown-val">₹0</span>
+            </div>
+            <div class="breakdown-row highlight-refund">
+              <span class="breakdown-label">Potential refundable stake:</span>
+              <strong id="breakdown-refundable" class="breakdown-val">₹1,000</strong>
+            </div>
+          </div>
+
+          <!-- Legal & Escrow Disclosure Card -->
+          <div class="stake-legal-box">
+            <div class="legal-box-header">
+              <div class="legal-pill">
+                <span class="legal-shield">🛡️</span>
+                <span class="legal-pill-text">100% Refundable Escrow Protection</span>
+              </div>
+              <button type="button" id="btn-open-stake-legal" class="btn-read-legal">
+                Legal Protections & Escrow Terms ↗
+              </button>
+            </div>
+            <p class="legal-box-summary">
+              Funds are held in segregated, third-party escrow. <strong>This is NOT a casino, lottery, or gambling contest.</strong> It is a legally binding self-accountability commitment contract. Complete your locked challenge criteria and 100% of your stake is returned to your original payment method.
+            </p>
+          </div>
+
+          <div class="stake-ack-row">
+            <label class="stake-checkbox-label">
+              <input type="checkbox" id="rules-ack-checkbox" />
+              <span>I understand the challenge rules and what happens to my stake if I fail.</span>
+            </label>
+          </div>
+        </div>
+
+        <!-- Challenge Name -->
+        <div class="form-group">
+          <label for="name" class="form-label">Challenge Name</label>
+          <input
+            type="text"
+            id="name"
+            name="name"
+            class="form-input"
+            required
+            value="100 Days Build in Public"
+            placeholder="e.g. 100 Days Build in Public"
+          />
+        </div>
+
+        <!-- Description -->
+        <div class="form-group">
+          <label for="description" class="form-label">Description (Optional)</label>
+          <input
+            type="text"
+            id="description"
+            name="description"
+            class="form-input"
+            placeholder="e.g. Shipping 3 micro-SaaS apps and documenting every day."
+          />
+        </div>
+
+        <!-- Duration & Dates Grid -->
+        <div class="form-row-2">
+          <div class="form-group">
+            <label class="form-label">Duration (Days)</label>
+            <div class="duration-selector">
+              <button type="button" class="duration-btn" data-days="30">30</button>
+              <button type="button" class="duration-btn" data-days="50">50</button>
+              <button type="button" class="duration-btn active" data-days="100">100</button>
+              <input
+                type="number"
+                id="custom-duration"
+                name="duration"
+                class="form-input duration-custom-input"
+                value="100"
+                min="1"
+                max="1000"
+                title="Custom days"
+              />
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label for="start_date" class="form-label">Start Date</label>
+            <input
+              type="date"
+              id="start_date"
+              name="start_date"
+              class="form-input"
+              value={today}
+              required
+            />
+          </div>
+        </div>
+
+        <!-- Calculated End Date preview -->
+        <div class="end-date-preview-box">
+          <span class="preview-label">Calculated End Date:</span>
+          <span id="calculated-end-date" class="preview-value">{defaultEndDate}</span>
+        </div>
+
+        <!-- Success Criteria Rule -->
+        <div class="form-group">
+          <label class="form-label">What counts as a successful day?</label>
+          <div class="rule-options">
+            <label class="rule-option">
+              <input type="radio" name="success_rule" value="all" checked />
+              <div class="rule-text">
+                <span class="rule-title">Complete all activities</span>
+                <span class="rule-desc">Every active activity must be checked</span>
+              </div>
+            </label>
+
+            <label class="rule-option">
+              <input type="radio" name="success_rule" value="at_least_one" />
+              <div class="rule-text">
+                <span class="rule-title">Complete at least one activity</span>
+                <span class="rule-desc">Any activity completed maintains your streak</span>
+              </div>
+            </label>
+
+            <label class="rule-option">
+              <input type="radio" name="success_rule" value="custom_min" />
+              <div class="rule-text">
+                <span class="rule-title">Custom minimum count</span>
+                <span class="rule-desc">Complete at least X activities per day</span>
+              </div>
+              <input
+                type="number"
+                id="success_min_count"
+                name="success_min_count"
+                class="form-input min-count-input"
+                min="1"
+                max="10"
+                value="2"
+                style="display: none;"
+              />
+            </label>
+          </div>
+        </div>
+
+        <!-- Visibility Settings -->
+        <div class="form-group">
+          <label class="form-label">Visibility</label>
+          <div class="visibility-selector">
+            <label class="visibility-option">
+              <input type="radio" name="visibility" value="private" checked />
+              <div class="vis-text">
+                <span class="vis-title">Private</span>
+                <span class="vis-desc">Only you can see this challenge</span>
+              </div>
+            </label>
+
+            <label class="visibility-option">
+              <input type="radio" name="visibility" value="community" />
+              <div class="vis-text">
+                <span class="vis-title">Community</span>
+                <span class="vis-desc">Visible on the community feed</span>
+              </div>
+            </label>
+
+            <label class="visibility-option">
+              <input type="radio" name="visibility" value="public" />
+              <div class="vis-text">
+                <span class="vis-title">Public</span>
+                <span class="vis-desc">Anyone with the link can view</span>
+              </div>
+            </label>
+          </div>
+        </div>
+
+        <!-- Activities Section -->
+        <div class="form-group">
+          <div class="activities-header">
+            <label class="form-label">Daily Activities</label>
+            <span class="activities-sub">Columns on your spreadsheet tracker</span>
+          </div>
+
+          <div id="activities-list" class="activities-container">
+            <!-- Populated via JS -->
+          </div>
+
+          <button type="button" id="btn-add-activity" class="btn btn-secondary btn-sm add-act-btn">
+            <Icons name="plus" size={14} />
+            <span>Add Activity</span>
+          </button>
+        </div>
+
+        <div class="form-actions">
+          <a href="/app" class="btn btn-secondary">Cancel</a>
+          <button type="submit" id="btn-submit-challenge" class="btn btn-primary">
+            Create Challenge & Open Tracker
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Legal Disclosures & Escrow Agreement Modal -->
+  <div id="stake-legal-modal" class="modal-overlay" role="dialog" aria-modal="true" style="display: none;">
+    <div class="modal-content legal-modal-card">
+      <div class="legal-modal-header">
+        <div class="legal-modal-badge">
+          <span>🛡️ Compliance & Escrow Protection</span>
+        </div>
+        <button type="button" id="btn-close-legal-modal" class="btn-icon modal-close-btn" aria-label="Close">✕</button>
+      </div>
+
+      <div class="legal-modal-title-area">
+        <h3 class="legal-modal-title">How Accountability Deposits & Escrow Work</h3>
+        <p class="legal-modal-sub">
+          StreakGrid operates under transparent contractual accountability rules. Review our escrow guarantees, refund mechanics, and user protections below.
+        </p>
+      </div>
+
+      <div class="legal-modal-body">
+        <div class="legal-section">
+          <h4 class="legal-sec-title">1. Non-Gambling Legal Status</h4>
+          <p class="legal-sec-text">
+            StreakGrid is not a casino, betting service, sweepstakes, or game of chance. You are not wagering against other participants, and there are no prize pools or odds. This is a self-directed behavioral commitment contract governed under civil contract law. Success depends solely on your personal adherence to your locked daily habits.
+          </p>
+        </div>
+
+        <div class="legal-section">
+          <h4 class="legal-sec-title">2. Segregated Escrow Protection</h4>
+          <p class="legal-sec-text">
+            Your accountability deposit is held securely in segregated, ring-fenced escrow accounts with regulated banking and payment processing partners. StreakGrid never treats user deposits as company operational revenue, working capital, or investment funds.
+          </p>
+        </div>
+
+        <div class="legal-section">
+          <h4 class="legal-sec-title">3. 100% Principal Return Guarantee</h4>
+          <p class="legal-sec-text">
+            When you complete your challenge in compliance with your locked rules, 100% of your deposited stake is returned directly to your original payment method. StreakGrid charges zero platform commission or hidden cut on successful completions.
+          </p>
+        </div>
+
+        <div class="legal-section">
+          <h4 class="legal-sec-title">4. Immutable Commitment Lock</h4>
+          <p class="legal-sec-text">
+            To preserve integrity and prevent gaming, the moment your deposit is confirmed, your challenge rules (duration, start date, daily activities, and pass/fail thresholds) are permanently locked. Neither you nor StreakGrid administrators can retroactively alter criteria.
+          </p>
+        </div>
+
+        <div class="legal-section">
+          <h4 class="legal-sec-title">5. Anti-Casino Forfeiture Disposition</h4>
+          <p class="legal-sec-text">
+            If a challenge is abandoned or the consistency criteria are missed, forfeited deposits do NOT become platform corporate gaming profits. They are distributed to designated public benefit charities and the community accountability reserve pool under published settlement terms.
+          </p>
+        </div>
+
+        <div class="legal-section">
+          <h4 class="legal-sec-title">6. 7-Day Dispute Window & Human Review</h4>
+          <p class="legal-sec-text">
+            In the event of verified technical service outages, medical emergencies, or proof discrepancies, you have a 7-day dispute window following the challenge end date to submit evidence for review by our administrative compliance team.
+          </p>
+        </div>
+
+        <div class="legal-section">
+          <h4 class="legal-sec-title">7. Eligibility & Official Documentation</h4>
+          <p class="legal-sec-text">
+            You must be at least 18 years of age to participate in Stake Challenges. By proceeding, you agree to our official published terms and policies:
+          </p>
+          <div class="legal-links-row">
+            <a href="/rules" target="_blank" class="legal-doc-link">Official Challenge Rules ↗</a>
+            <a href="/refund-policy" target="_blank" class="legal-doc-link">Refund & Settlement Policy ↗</a>
+            <a href="/terms" target="_blank" class="legal-doc-link">Terms of Service ↗</a>
+            <a href="/privacy" target="_blank" class="legal-doc-link">Privacy Policy ↗</a>
+          </div>
+        </div>
+      </div>
+
+      <div class="legal-modal-footer">
+        <button type="button" id="btn-agree-legal-modal" class="btn btn-primary">
+          I Understand & Agree to Terms
+        </button>
+      </div>
+    </div>
+  </div>
+</AppLayout>
+
+<style>
+  .create-challenge-container {
+    max-width: 660px;
+    margin: 20px auto 60px auto;
+  }
+
+  .create-card {
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-modal);
+    box-shadow: var(--shadow-sm);
+    padding: 32px 28px;
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+  }
+
+  .create-header {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .create-title {
+    font-size: 24px;
+    font-weight: 700;
+    color: var(--color-text);
+  }
+
+  .create-sub {
+    font-size: 13px;
+    color: var(--color-muted);
+  }
+
+  .template-selector-box {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+    padding: 10px 12px;
+    background: var(--color-surface-subtle);
+    border: 1px solid var(--color-border-subtle);
+    border-radius: var(--radius-panel);
+  }
+
+  .template-label {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--color-muted);
+  }
+
+  .template-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  .template-chip {
+    padding: 4px 10px;
+    border-radius: var(--radius-sm);
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--color-text);
+    transition: all 0.1s ease;
+  }
+
+  .template-chip:hover {
+    border-color: var(--color-primary);
+    color: var(--color-primary-hover);
+  }
+
+  .create-form {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+  }
+
+  .form-group {
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* Challenge Type Cards */
+  .challenge-type-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+  }
+
+  .type-card {
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-panel);
+    padding: 14px;
+    background: var(--color-surface);
+    cursor: pointer;
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    transition: all 0.15s ease;
+  }
+
+  .type-card:hover {
+    background: var(--color-surface-hover);
+  }
+
+  .type-card.selected {
+    border-color: var(--color-primary);
+    background: #F3FAF5;
+  }
+
+  .type-card input[type='radio'] {
+    margin-top: 3px;
+    accent-color: var(--color-primary);
+  }
+
+  .type-card-content {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .type-head {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+  }
+
+  .type-title {
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--color-text);
+  }
+
+  .type-icon {
+    color: var(--color-primary-hover);
+    font-weight: 800;
+  }
+
+  .type-tag {
+    font-size: 10px;
+    padding: 2px 6px;
+    border-radius: 4px;
+    background: var(--color-streak-soft);
+    color: var(--color-streak-hover);
+    font-weight: 700;
+    letter-spacing: 0.04em;
+  }
+
+  .type-desc {
+    font-size: 12px;
+    color: var(--color-muted);
+    line-height: 1.4;
+  }
+
+  /* Stake Configuration Panel */
+  .stake-config-panel {
+    background: #FAF9F5;
+    border: 1px solid rgba(245, 158, 11, 0.35);
+    border-radius: var(--radius-panel);
+    padding: 18px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .stake-panel-header {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .stake-panel-badge {
+    align-self: flex-start;
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--color-streak-hover);
+    background: var(--color-streak-soft);
+    padding: 2px 8px;
+    border-radius: 4px;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+
+  .stake-panel-title {
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--color-text);
+  }
+
+  .stake-panel-desc {
+    font-size: 13px;
+    color: var(--color-text-secondary);
+    line-height: 1.4;
+    font-style: italic;
+  }
+
+  .stake-inputs-grid {
+    display: grid;
+    grid-template-columns: 140px 1fr;
+    gap: 12px;
+  }
+
+  .stake-presets {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-bottom: 6px;
+  }
+
+  .stake-preset-btn {
+    padding: 4px 10px;
+    border-radius: var(--radius-sm);
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--color-text);
+  }
+
+  .stake-preset-btn.active {
+    background: var(--color-streak);
+    color: #FFFFFF;
+    border-color: var(--color-streak);
+  }
+
+  .stake-number-input {
+    font-size: 16px;
+    font-weight: 700;
+  }
+
+  .stake-breakdown-box {
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    padding: 12px 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .breakdown-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 13px;
+  }
+
+  .breakdown-label {
+    color: var(--color-muted);
+  }
+
+  .breakdown-val {
+    font-variant-numeric: tabular-nums;
+  }
+
+  .highlight-refund {
+    border-top: 1px solid var(--color-border-subtle);
+    padding-top: 8px;
+    color: var(--color-primary-hover);
+  }
+
+  /* Legal Notice Box inside Stake Panel */
+  .stake-legal-box {
+    background: #F4FAF6;
+    border: 1px solid rgba(34, 197, 94, 0.35);
+    border-radius: var(--radius-sm);
+    padding: 12px 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .legal-box-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .legal-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--color-primary-hover);
+    background: var(--color-primary-light);
+    padding: 2px 8px;
+    border-radius: 4px;
+    letter-spacing: 0.02em;
+  }
+
+  .btn-read-legal {
+    background: none;
+    border: none;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--color-primary-hover);
+    cursor: pointer;
+    text-decoration: underline;
+    padding: 0;
+    transition: color 0.1s ease;
+  }
+
+  .btn-read-legal:hover {
+    color: #15803D;
+  }
+
+  .legal-box-summary {
+    font-size: 12px;
+    color: var(--color-text-secondary);
+    line-height: 1.45;
+    margin: 0;
+  }
+
+  .stake-checkbox-label {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    font-size: 12px;
+    color: var(--color-text);
+    cursor: pointer;
+  }
+
+  /* Legal Modal Styles */
+  .legal-modal-card {
+    max-width: 640px;
+    max-height: 88vh;
+    width: 100%;
+    background: var(--color-surface);
+    border-radius: var(--radius-modal);
+    box-shadow: var(--shadow-lg);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    animation: subtleFadeIn 0.2s ease;
+  }
+
+  .legal-modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 18px 22px 10px 22px;
+  }
+
+  .legal-modal-badge {
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--color-primary-hover);
+    background: var(--color-primary-light);
+    padding: 3px 8px;
+    border-radius: 4px;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+  }
+
+  .modal-close-btn {
+    font-size: 16px;
+    color: var(--color-muted);
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 4px 8px;
+    border-radius: 4px;
+  }
+
+  .modal-close-btn:hover {
+    color: var(--color-text);
+    background: var(--color-surface-hover);
+  }
+
+  .legal-modal-title-area {
+    padding: 0 22px 14px 22px;
+    border-bottom: 1px solid var(--color-border-subtle);
+  }
+
+  .legal-modal-title {
+    font-size: 18px;
+    font-weight: 800;
+    color: var(--color-text);
+    letter-spacing: -0.01em;
+  }
+
+  .legal-modal-sub {
+    font-size: 13px;
+    color: var(--color-muted);
+    margin-top: 3px;
+    line-height: 1.4;
+  }
+
+  .legal-modal-body {
+    padding: 18px 22px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .legal-section {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .legal-sec-title {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--color-text);
+  }
+
+  .legal-sec-text {
+    font-size: 12px;
+    color: var(--color-text-secondary);
+    line-height: 1.5;
+    margin: 0;
+  }
+
+  .legal-links-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 6px;
+  }
+
+  .legal-doc-link {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--color-primary-hover);
+    padding: 4px 10px;
+    background: var(--color-surface-subtle);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    text-decoration: none;
+    transition: all 0.1s ease;
+  }
+
+  .legal-doc-link:hover {
+    background: var(--color-surface-hover);
+    border-color: var(--color-primary);
+  }
+
+  .legal-modal-footer {
+    padding: 14px 22px;
+    border-top: 1px solid var(--color-border-subtle);
+    display: flex;
+    justify-content: flex-end;
+    background: var(--color-surface-subtle);
+  }
+
+  .stake-checkbox-label input {
+    margin-top: 2px;
+    accent-color: var(--color-primary);
+  }
+
+  /* Visibility Selector */
+  .visibility-selector {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+  }
+
+  .visibility-option {
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    padding: 8px 10px;
+    background: var(--color-surface);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .visibility-option input[type='radio'] {
+    accent-color: var(--color-primary);
+  }
+
+  .vis-text {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .vis-title {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--color-text);
+  }
+
+  .vis-desc {
+    font-size: 11px;
+    color: var(--color-muted);
+  }
+
+  .form-row-2 {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+  }
+
+  .duration-selector {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .duration-btn {
+    flex: 1;
+    padding: 8px 10px;
+    border-radius: var(--radius-sm);
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--color-text);
+    transition: all 0.1s ease;
+  }
+
+  .duration-btn:hover {
+    background: var(--color-surface-hover);
+  }
+
+  .duration-btn.active {
+    background: var(--color-primary);
+    color: #FFFFFF;
+    border-color: var(--color-primary);
+  }
+
+  .duration-custom-input {
+    width: 68px;
+    padding: 8px 6px;
+    text-align: center;
+  }
+
+  .end-date-preview-box {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 12px;
+    background: var(--color-surface-subtle);
+    border-radius: var(--radius-sm);
+    font-size: 12px;
+  }
+
+  .preview-label {
+    color: var(--color-muted);
+  }
+
+  .preview-value {
+    font-weight: 600;
+    color: var(--color-text);
+  }
+
+  .rule-options {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .rule-option {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 10px 12px;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    background: var(--color-surface);
+    cursor: pointer;
+    transition: all 0.1s ease;
+  }
+
+  .rule-option:hover {
+    background: var(--color-surface-hover);
+  }
+
+  .rule-option input[type='radio'] {
+    margin-top: 3px;
+    accent-color: var(--color-primary);
+  }
+
+  .rule-text {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .rule-title {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--color-text);
+  }
+
+  .rule-desc {
+    font-size: 12px;
+    color: var(--color-muted);
+  }
+
+  .min-count-input {
+    width: 60px;
+    padding: 4px 6px;
+    margin-left: 8px;
+  }
+
+  .activities-header {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    margin-bottom: 6px;
+  }
+
+  .activities-sub {
+    font-size: 11px;
+    color: var(--color-muted);
+  }
+
+  .activities-container {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-bottom: 10px;
+  }
+
+  :global(.activity-row) {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    animation: subtleFadeIn 0.15s ease;
+  }
+
+  :global(.activity-icon-select) {
+    width: 130px;
+    padding: 8px 6px;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--color-border);
+    background: var(--color-surface);
+    color: var(--color-text);
+    font-size: 13px;
+  }
+
+  :global(.activity-name-input) {
+    flex: 1;
+    padding: 8px 10px;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--color-border);
+    background: var(--color-surface);
+    color: var(--color-text);
+    font-size: 13px;
+  }
+
+  :global(.activity-name-input:focus),
+  :global(.activity-icon-select:focus) {
+    border-color: var(--color-primary);
+    outline: none;
+  }
+
+  .add-act-btn {
+    align-self: flex-start;
+  }
+
+  .form-actions {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 10px;
+    margin-top: 10px;
+    padding-top: 16px;
+    border-top: 1px solid var(--color-border-subtle);
+  }
+
+  .error-box {
+    padding: 10px 14px;
+    border-radius: var(--radius-sm);
+    background: #FEE2E2;
+    border: 1px solid #FCA5A5;
+    color: #B91C1C;
+    font-size: 13px;
+  }
+
+  @media (max-width: 640px) {
+    .challenge-type-grid,
+    .visibility-selector,
+    .form-row-2,
+    .stake-inputs-grid {
+      grid-template-columns: 1fr;
+    }
+    .create-card {
+      padding: 20px 16px;
+    }
+  }
+</style>
+
+<script>
+  import { addDays } from '../../../lib/engine';
+  import { ALL_ICONS, detectIconFromName } from '../../../lib/icons';
+
+  const form = document.getElementById('create-challenge-form') as HTMLFormElement;
+  const nameInput = document.getElementById('name') as HTMLInputElement;
+  const descInput = document.getElementById('description') as HTMLInputElement;
+  const startDateInput = document.getElementById('start_date') as HTMLInputElement;
+  const durationInput = document.getElementById('custom-duration') as HTMLInputElement;
+  const calculatedEndDate = document.getElementById('calculated-end-date');
+  const durationBtns = document.querySelectorAll('.duration-btn');
+  const ruleRadios = document.querySelectorAll('input[name="success_rule"]');
+  const minCountInput = document.getElementById('success_min_count') as HTMLInputElement;
+  const activitiesList = document.getElementById('activities-list') as HTMLElement;
+  const addActivityBtn = document.getElementById('btn-add-activity') as HTMLButtonElement;
+  const submitBtn = document.getElementById('btn-submit-challenge') as HTMLButtonElement;
+  const errorBox = document.getElementById('error-alert');
+
+  // Stake elements
+  const typeCardFree = document.getElementById('type-card-free');
+  const typeCardStake = document.getElementById('type-card-stake');
+  const stakePanel = document.getElementById('stake-config-panel');
+  const stakeCurrencySelect = document.getElementById('stake_currency') as HTMLSelectElement;
+  const stakeAmountInput = document.getElementById('stake_amount') as HTMLInputElement;
+  const presetsContainer = document.getElementById('stake-presets-container') as HTMLElement;
+  const breakdownAtRisk = document.getElementById('breakdown-at-risk');
+  const breakdownFee = document.getElementById('breakdown-fee');
+  const breakdownRefundable = document.getElementById('breakdown-refundable');
+  const rulesAckCheckbox = document.getElementById('rules-ack-checkbox') as HTMLInputElement;
+
+  // Legal modal elements
+  const openLegalBtn = document.getElementById('btn-open-stake-legal');
+  const closeLegalBtn = document.getElementById('btn-close-legal-modal');
+  const agreeLegalBtn = document.getElementById('btn-agree-legal-modal');
+  const stakeLegalModal = document.getElementById('stake-legal-modal');
+
+  // Parse server-provided currency configs
+  const currencyDataEl = document.getElementById('currency-configs-data');
+  const CURRENCY_CONFIGS: Record<string, { code: string; symbol: string; minStake: number; maxStake: number; step: number; presetAmounts: number[]; defaultAmount: number }> =
+    currencyDataEl ? JSON.parse(currencyDataEl.textContent || '{}') : {};
+
+  let currentChallengeType: 'free' | 'stake' = 'free';
+
+  // Toggle Challenge Type
+  function updateChallengeType(type: 'free' | 'stake') {
+    currentChallengeType = type;
+    if (typeCardFree) typeCardFree.classList.toggle('selected', type === 'free');
+    if (typeCardStake) typeCardStake.classList.toggle('selected', type === 'stake');
+    if (stakePanel) stakePanel.style.display = type === 'stake' ? 'flex' : 'none';
+
+    updateStakeBreakdown();
+  }
+
+  document.querySelectorAll('input[name="challenge_type"]').forEach((radio) => {
+    radio.addEventListener('change', (e) => {
+      const val = (e.target as HTMLInputElement).value as 'free' | 'stake';
+      updateChallengeType(val);
+    });
+  });
+
+  // Stake breakdown & currency updates
+  function updateStakeBreakdown() {
+    const amount = Number(stakeAmountInput?.value) || 0;
+    const curr = stakeCurrencySelect?.value || 'INR';
+    const cfg = CURRENCY_CONFIGS[curr] || { symbol: '₹' };
+    const symbol = cfg.symbol || (curr === 'USD' ? '$' : curr === 'EUR' ? '€' : curr === 'GBP' ? '£' : '₹');
+
+    if (breakdownAtRisk) breakdownAtRisk.textContent = `${symbol}${amount.toLocaleString()}`;
+    if (breakdownFee) breakdownFee.textContent = `${symbol}0`;
+    if (breakdownRefundable) breakdownRefundable.textContent = `${symbol}${amount.toLocaleString()}`;
+
+    if (submitBtn) {
+      if (currentChallengeType === 'stake') {
+        submitBtn.textContent = `Continue to Payment & Rules (${symbol}${amount.toLocaleString()})`;
+      } else {
+        submitBtn.textContent = 'Create Challenge & Open Tracker';
+      }
+    }
+  }
+
+  // Dynamically render presets for selected currency
+  function renderPresetsForCurrency(currencyCode: string) {
+    const cfg = CURRENCY_CONFIGS[currencyCode] || CURRENCY_CONFIGS.INR;
+    if (!cfg || !presetsContainer) return;
+
+    presetsContainer.innerHTML = '';
+    const defAmt = cfg.defaultAmount || cfg.presetAmounts[0] || 50;
+
+    cfg.presetAmounts.forEach((amt) => {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = `stake-preset-btn ${amt === defAmt ? 'active' : ''}`;
+      btn.dataset.amount = String(amt);
+      btn.textContent = `${cfg.symbol}${amt.toLocaleString()}`;
+
+      btn.addEventListener('click', () => {
+        presetsContainer.querySelectorAll('.stake-preset-btn').forEach((b) => b.classList.remove('active'));
+        btn.classList.add('active');
+        if (stakeAmountInput) {
+          stakeAmountInput.value = String(amt);
+          updateStakeBreakdown();
+        }
+      });
+
+      presetsContainer.appendChild(btn);
+    });
+
+    if (stakeAmountInput) {
+      stakeAmountInput.value = String(defAmt);
+      stakeAmountInput.min = String(cfg.minStake || 10);
+      stakeAmountInput.max = String(cfg.maxStake || 50000);
+      stakeAmountInput.step = String(cfg.step || 5);
+      stakeAmountInput.placeholder = `e.g. ${defAmt}`;
+    }
+
+    updateStakeBreakdown();
+  }
+
+  if (stakeAmountInput) {
+    stakeAmountInput.addEventListener('input', () => {
+      const val = Number(stakeAmountInput.value);
+      if (presetsContainer) {
+        presetsContainer.querySelectorAll('.stake-preset-btn').forEach((b) => {
+          const bAmt = Number((b as HTMLElement).dataset.amount);
+          b.classList.toggle('active', bAmt === val);
+        });
+      }
+      updateStakeBreakdown();
+    });
+  }
+
+  if (stakeCurrencySelect) {
+    stakeCurrencySelect.addEventListener('change', () => {
+      renderPresetsForCurrency(stakeCurrencySelect.value);
+    });
+  }
+
+  // Initial preset render for default currency
+  if (stakeCurrencySelect) {
+    renderPresetsForCurrency(stakeCurrencySelect.value);
+  }
+
+  // Legal Modal Handlers
+  if (openLegalBtn && stakeLegalModal) {
+    openLegalBtn.addEventListener('click', () => {
+      stakeLegalModal.style.display = 'flex';
+      stakeLegalModal.classList.add('active');
+    });
+  }
+
+  if (closeLegalBtn && stakeLegalModal) {
+    closeLegalBtn.addEventListener('click', () => {
+      stakeLegalModal.style.display = 'none';
+      stakeLegalModal.classList.remove('active');
+    });
+  }
+
+  if (agreeLegalBtn && stakeLegalModal) {
+    agreeLegalBtn.addEventListener('click', () => {
+      stakeLegalModal.style.display = 'none';
+      stakeLegalModal.classList.remove('active');
+      if (rulesAckCheckbox) {
+        rulesAckCheckbox.checked = true;
+      }
+    });
+  }
+
+  if (stakeLegalModal) {
+    stakeLegalModal.addEventListener('click', (e) => {
+      if (e.target === stakeLegalModal) {
+        stakeLegalModal.style.display = 'none';
+        stakeLegalModal.classList.remove('active');
+      }
+    });
+  }
+
+  // Template Presets Data
+  const TEMPLATES: Record<string, { name: string; desc: string; duration: number; activities: Array<{ name: string; icon: string }> }> = {
+    bip: {
+      name: '100 Days Build in Public',
+      desc: 'Shipping features and documenting daily progress publicly.',
+      duration: 100,
+      activities: [
+        { name: 'X / Twitter', icon: 'x' },
+        { name: 'LinkedIn', icon: 'linkedin' },
+        { name: 'YouTube', icon: 'youtube' },
+        { name: 'Reddit', icon: 'reddit' },
+        { name: 'Instagram', icon: 'instagram' }
+      ]
+    },
+    code: {
+      name: '50 Days of Code',
+      desc: 'Building and pushing code to GitHub every single day.',
+      duration: 50,
+      activities: [
+        { name: 'Code 1hr', icon: 'code' },
+        { name: 'GitHub Commit', icon: 'git' },
+        { name: 'Learn Concept', icon: 'book' },
+        { name: 'Share Update', icon: 'share' }
+      ]
+    },
+    fitness: {
+      name: '30 Days Fitness & Energy',
+      desc: 'Daily physical discipline and movement.',
+      duration: 30,
+      activities: [
+        { name: 'Workout', icon: 'activity' },
+        { name: 'Clean Diet', icon: 'check' },
+        { name: 'Hydration 3L', icon: 'target' },
+        { name: '8h Sleep', icon: 'moon' }
+      ]
+    },
+    custom: {
+      name: 'My New Challenge',
+      desc: '',
+      duration: 30,
+      activities: [{ name: 'Daily Goal', icon: 'target' }]
+    }
+  };
+
+  // Date calculation
+  function updateEndDate() {
+    if (!startDateInput || !durationInput || !calculatedEndDate) return;
+    const sDate = startDateInput.value;
+    const dur = parseInt(durationInput.value, 10) || 1;
+    calculatedEndDate.textContent = addDays(sDate, dur - 1);
+  }
+
+  startDateInput.addEventListener('change', updateEndDate);
+  durationInput.addEventListener('input', () => {
+    durationBtns.forEach((b) => b.classList.remove('active'));
+    updateEndDate();
+  });
+
+  durationBtns.forEach((btn) => {
+    btn.addEventListener('click', () => {
+      durationBtns.forEach((b) => b.classList.remove('active'));
+      btn.classList.add('active');
+      const days = (btn as HTMLElement).dataset.days!;
+      durationInput.value = days;
+      updateEndDate();
+    });
+  });
+
+  // Radio listener for custom_min
+  ruleRadios.forEach((radio) => {
+    radio.addEventListener('change', (e) => {
+      const target = e.target as HTMLInputElement;
+      minCountInput.style.display = target.value === 'custom_min' ? 'inline-block' : 'none';
+    });
+  });
+
+  function createActivityRow(name: string = '', icon: string = 'target'): HTMLElement {
+    const row = document.createElement('div');
+    row.className = 'activity-row';
+
+    const select = document.createElement('select');
+    select.className = 'activity-icon-select';
+    ALL_ICONS.forEach((ic) => {
+      const opt = document.createElement('option');
+      opt.value = ic.value;
+      opt.textContent = ic.label;
+      if (ic.value === icon) opt.selected = true;
+      select.appendChild(opt);
+    });
+
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.className = 'activity-name-input';
+    input.placeholder = 'Activity name (e.g. Write Blog, Workout)';
+    input.value = name;
+
+    // Smart icon auto-select on input
+    input.addEventListener('blur', () => {
+      if (select.value === 'target' && input.value.trim()) {
+        const detected = detectIconFromName(input.value.trim());
+        if (detected) select.value = detected;
+      }
+    });
+
+    const removeBtn = document.createElement('button');
+    removeBtn.type = 'button';
+    removeBtn.className = 'btn-icon delete-act-btn';
+    removeBtn.title = 'Remove activity';
+    removeBtn.innerHTML = '✕';
+    removeBtn.addEventListener('click', () => {
+      if (activitiesList.children.length > 1) {
+        row.remove();
+      }
+    });
+
+    row.appendChild(select);
+    row.appendChild(input);
+    row.appendChild(removeBtn);
+    return row;
+  }
+
+  function loadTemplate(key: string) {
+    const t = TEMPLATES[key];
+    if (!t) return;
+    if (nameInput) nameInput.value = t.name;
+    if (descInput) descInput.value = t.desc;
+    if (durationInput) {
+      durationInput.value = String(t.duration);
+      durationBtns.forEach((b) => {
+        b.classList.toggle('active', (b as HTMLElement).dataset.days === String(t.duration));
+      });
+      updateEndDate();
+    }
+
+    activitiesList.innerHTML = '';
+    t.activities.forEach((act) => {
+      activitiesList.appendChild(createActivityRow(act.name, act.icon));
+    });
+  }
+
+  // Template chips
+  document.querySelectorAll('.template-chip').forEach((chip) => {
+    chip.addEventListener('click', () => {
+      const templateKey = (chip as HTMLElement).dataset.template!;
+      loadTemplate(templateKey);
+    });
+  });
+
+  addActivityBtn.addEventListener('click', () => {
+    activitiesList.appendChild(createActivityRow('', 'target'));
+  });
+
+  // Initial template load (100 Days Build in Public)
+  loadTemplate('bip');
+
+  // Submit form
+  if (form) {
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      if (errorBox) errorBox.style.display = 'none';
+
+      if (currentChallengeType === 'stake') {
+        if (rulesAckCheckbox && !rulesAckCheckbox.checked) {
+          if (errorBox) {
+            errorBox.textContent = 'Please confirm that you understand the challenge rules and what happens to your stake if you fail.';
+            errorBox.style.display = 'block';
+          }
+          return;
+        }
+      }
+
+      const name = nameInput.value.trim();
+      const description = descInput.value.trim();
+      const duration = parseInt(durationInput.value, 10);
+      const start_date = startDateInput.value;
+
+      let success_rule = 'all';
+      ruleRadios.forEach((r) => {
+        if ((r as HTMLInputElement).checked) {
+          success_rule = (r as HTMLInputElement).value;
+        }
+      });
+      const success_min_count = parseInt(minCountInput.value, 10) || 1;
+
+      let visibility = 'private';
+      document.querySelectorAll('input[name="visibility"]').forEach((r) => {
+        if ((r as HTMLInputElement).checked) {
+          visibility = (r as HTMLInputElement).value;
+        }
+      });
+
+      // Extract activities with smart icon detection
+      const activities: Array<{ name: string; icon: string }> = [];
+      activitiesList.querySelectorAll('.activity-row').forEach((row) => {
+        const sel = row.querySelector('.activity-icon-select') as HTMLSelectElement;
+        const inp = row.querySelector('.activity-name-input') as HTMLInputElement;
+        const val = inp.value.trim();
+        if (val) {
+          const detected = detectIconFromName(val);
+          const iconToUse = sel.value && sel.value !== 'target' ? sel.value : detected;
+          activities.push({
+            name: val,
+            icon: iconToUse
+          });
+        }
+      });
+
+      if (activities.length === 0) {
+        if (errorBox) {
+          errorBox.textContent = 'Please add at least one activity to track.';
+          errorBox.style.display = 'block';
+        }
+        return;
+      }
+
+      if (submitBtn) {
+        submitBtn.setAttribute('disabled', 'true');
+        submitBtn.textContent = 'Setting up challenge...';
+      }
+
+      try {
+        const payload: any = {
+          name,
+          description,
+          duration,
+          start_date,
+          success_rule,
+          success_min_count,
+          visibility,
+          activities,
+          challenge_type: currentChallengeType
+        };
+
+        if (currentChallengeType === 'stake') {
+          payload.stake_amount = Number(stakeAmountInput.value) || 1000;
+          payload.stake_currency = stakeCurrencySelect.value || 'INR';
+        }
+
+        const res = await fetch('/api/challenges', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+
+        const data = await res.json();
+        if (res.ok && data.challenge) {
+          if (data.isStake && data.checkoutUrl) {
+            window.location.href = data.checkoutUrl;
+          } else {
+            window.location.href = `/app/challenges/${data.challenge.id}`;
+          }
+        } else {
+          if (errorBox) {
+            errorBox.textContent = data.error || 'Failed to create challenge.';
+            errorBox.style.display = 'block';
+          }
+          if (submitBtn) {
+            submitBtn.removeAttribute('disabled');
+            updateStakeBreakdown();
+          }
+        }
+      } catch {
+        if (errorBox) {
+          errorBox.textContent = 'Network error. Please try again.';
+          errorBox.style.display = 'block';
+        }
+        if (submitBtn) {
+          submitBtn.removeAttribute('disabled');
+          updateStakeBreakdown();
+        }
+      }
+    });
+  }
+</script>

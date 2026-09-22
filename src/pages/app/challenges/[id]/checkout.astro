@@ -1,0 +1,566 @@
+---
+import AppLayout from '../../../../layouts/AppLayout.astro';
+import Icons from '../../../../components/Icons.astro';
+import { getUserFromCookies } from '../../../../lib/auth';
+import { db } from '../../../../lib/db';
+import { getChallengeStakeCommitment } from '../../../../lib/stakes';
+import { getCurrencyConfig, formatCurrencyAmount } from '../../../../lib/config';
+import type { Challenge, Activity } from '../../../../lib/types';
+
+const user = getUserFromCookies(Astro.cookies);
+if (!user) {
+  return Astro.redirect('/login');
+}
+
+const { id } = Astro.params;
+if (!id) {
+  return Astro.redirect('/app');
+}
+
+const challenge = db
+  .prepare('SELECT * FROM challenges WHERE id = ? AND user_id = ?')
+  .get(id, user.id) as Challenge | undefined;
+
+if (!challenge) {
+  return Astro.redirect('/app');
+}
+
+const commitment = getChallengeStakeCommitment(id);
+if (!commitment) {
+  return Astro.redirect(`/app/challenges/${id}`);
+}
+
+// If already paid and active, redirect straight to the challenge tracker
+if (['active', 'paid'].includes(commitment.status)) {
+  return Astro.redirect(`/app/challenges/${id}`);
+}
+
+const activities = db
+  .prepare('SELECT * FROM activities WHERE challenge_id = ? ORDER BY sort_order ASC')
+  .all(id) as Activity[];
+
+const providerPaymentId = Astro.url.searchParams.get('provider_payment_id') || commitment.provider_payment_id || '';
+const currCfg = getCurrencyConfig(commitment.currency);
+const formattedStake = formatCurrencyAmount(commitment.amount, commitment.currency);
+---
+
+<AppLayout title={`Commit to ${challenge.name} — StreakGrid`} activeChallengeId={challenge.id}>
+  <div class="checkout-container">
+    <div class="checkout-card">
+      <!-- Top Commitment Header -->
+      <div class="checkout-header">
+        <div class="checkout-pill">
+          <span class="pill-dot"></span>
+          <span>Accountability Commitment</span>
+        </div>
+        <h1 class="checkout-title">Put something meaningful on the line.</h1>
+        <p class="checkout-sub">
+          Show up every day. Complete your challenge according to its locked rules. Get your stake returned.
+        </p>
+      </div>
+
+      <div id="checkout-alert" class="alert-box" style="display: none;"></div>
+
+      <!-- 5-Step Transparency Breakdown -->
+      <div class="checkout-steps">
+        <!-- Step 1: Your Challenge -->
+        <div class="step-box">
+          <div class="step-head">
+            <span class="step-badge">1</span>
+            <h3 class="step-name">Your Challenge</h3>
+          </div>
+          <div class="step-content challenge-summary-row">
+            <div>
+              <span class="summary-label">Name</span>
+              <strong class="summary-val">{challenge.name}</strong>
+            </div>
+            <div>
+              <span class="summary-label">Duration</span>
+              <span class="summary-val">{challenge.duration} Days</span>
+            </div>
+            <div>
+              <span class="summary-label">Timeline</span>
+              <span class="summary-val">{challenge.start_date} to {challenge.end_date}</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Step 2: Your Commitment -->
+        <div class="step-box highlight-box">
+          <div class="step-head">
+            <span class="step-badge">2</span>
+            <h3 class="step-name">Your Stake & Breakdown</h3>
+          </div>
+          <div class="step-content financial-grid">
+            <div class="fin-item">
+              <span class="fin-label">Amount at risk</span>
+              <div class="fin-val fin-stake">{formattedStake}</div>
+            </div>
+            <div class="fin-item">
+              <span class="fin-label">Platform fee</span>
+              <div class="fin-val fin-fee">{currCfg.symbol}0</div>
+            </div>
+            <div class="fin-item">
+              <span class="fin-label">Potential refundable stake</span>
+              <div class="fin-val fin-refund">{formattedStake}</div>
+            </div>
+          </div>
+          <p class="fin-note">
+            Held securely in simulated regulated escrow. This is an accountability deposit, not an investment or casino game.
+          </p>
+        </div>
+
+        <!-- Step 3: Locked Rules -->
+        <div class="step-box">
+          <div class="step-head">
+            <span class="step-badge">3</span>
+            <h3 class="step-name">Locked Challenge Rules</h3>
+          </div>
+          <div class="step-content">
+            <ul class="rules-list">
+              <li>
+                <strong>Success Criteria:</strong>{' '}
+                {challenge.success_rule === 'all' && 'Complete ALL active daily activities each day.'}
+                {challenge.success_rule === 'at_least_one' && 'Complete AT LEAST ONE activity each day.'}
+                {challenge.success_rule === 'custom_min' && `Complete AT LEAST ${challenge.success_min_count} activities each day.`}
+              </li>
+              <li>
+                <strong>Daily Deadline:</strong> Day closes at 23:59:59 UTC / local midnight. No retro-filling missed past days to manipulate streaks.
+              </li>
+              <li>
+                <strong>Commitment Lock:</strong> Once active, duration, criteria, and stake cannot be reduced or deleted.
+              </li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- Step 4: What Happens -->
+        <div class="step-box">
+          <div class="step-head">
+            <span class="step-badge">4</span>
+            <h3 class="step-name">What Happens</h3>
+          </div>
+          <div class="step-content outcome-grid">
+            <div class="outcome-card success-outcome">
+              <span class="outcome-icon">✓</span>
+              <span class="outcome-title">If you succeed</span>
+              <p class="outcome-desc">
+                Meet your locked consistency criteria and your full {formattedStake} stake becomes eligible for return under published terms.
+              </p>
+            </div>
+            <div class="outcome-card forfeit-outcome">
+              <span class="outcome-icon">✕</span>
+              <span class="outcome-title">If you fail</span>
+              <p class="outcome-desc">
+                Challenge ends before reaching consistency target; your stake is forfeited according to the published rules.
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Step 5: Active Confirmation & Proceed -->
+      <form id="checkout-confirm-form" class="checkout-actions-area" data-challenge-id={challenge.id} data-provider-payment-id={providerPaymentId}>
+        <label class="terms-checkbox-label">
+          <input type="checkbox" id="rules-acknowledgement" required />
+          <span class="checkbox-text">
+            I understand the locked challenge rules and explicitly acknowledge what happens to my stake if I complete or fail this challenge.
+          </span>
+        </label>
+
+        <div class="action-buttons">
+          <a href={`/app/challenges/${challenge.id}`} class="btn btn-secondary">
+            Keep as Free Challenge
+          </a>
+          <button type="submit" id="btn-confirm-stake" class="btn btn-primary btn-stake-pay" disabled>
+            <Icons name="check" size={16} />
+            <span>Pay & Activate {formattedStake} Commitment</span>
+          </button>
+        </div>
+
+        <div class="security-guarantee">
+          <Icons name="target" size={13} />
+          <span>Server-verified idempotent payment flow • 100% transparent financial ledger</span>
+        </div>
+      </form>
+    </div>
+  </div>
+</AppLayout>
+
+<style>
+  .checkout-container {
+    max-width: 720px;
+    margin: 20px auto 60px auto;
+  }
+
+  .checkout-card {
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-modal);
+    box-shadow: var(--shadow-md);
+    padding: 36px 32px;
+    display: flex;
+    flex-direction: column;
+    gap: 28px;
+  }
+
+  .checkout-header {
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .checkout-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 3px 10px;
+    border-radius: 20px;
+    background: var(--color-streak-soft);
+    color: var(--color-streak-hover);
+    font-size: 12px;
+    font-weight: 600;
+  }
+
+  .pill-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--color-streak);
+  }
+
+  .checkout-title {
+    font-size: 26px;
+    font-weight: 800;
+    color: var(--color-text);
+    letter-spacing: -0.02em;
+  }
+
+  .checkout-sub {
+    font-size: 14px;
+    color: var(--color-text-secondary);
+    max-width: 520px;
+    line-height: 1.5;
+  }
+
+  .checkout-steps {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .step-box {
+    background: #FAF9F5;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-panel);
+    padding: 16px 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .highlight-box {
+    background: #F4FAF6;
+    border-color: rgba(34, 197, 94, 0.3);
+  }
+
+  .step-head {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .step-badge {
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    background: var(--color-text);
+    color: #FFFFFF;
+    font-size: 11px;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .highlight-box .step-badge {
+    background: var(--color-primary-hover);
+  }
+
+  .step-name {
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--color-text);
+  }
+
+  .challenge-summary-row {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+  }
+
+  .summary-label {
+    display: block;
+    font-size: 11px;
+    color: var(--color-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    margin-bottom: 2px;
+  }
+
+  .summary-val {
+    font-size: 13px;
+    color: var(--color-text);
+  }
+
+  .financial-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+    background: #FFFFFF;
+    border: 1px solid rgba(34, 197, 94, 0.2);
+    border-radius: var(--radius-sm);
+    padding: 12px 16px;
+  }
+
+  .fin-label {
+    display: block;
+    font-size: 11px;
+    color: var(--color-muted);
+    margin-bottom: 4px;
+  }
+
+  .fin-val {
+    font-size: 18px;
+    font-weight: 800;
+    letter-spacing: -0.01em;
+  }
+
+  .fin-stake {
+    color: var(--color-streak-hover);
+  }
+
+  .fin-fee {
+    color: var(--color-muted);
+  }
+
+  .fin-refund {
+    color: var(--color-primary-hover);
+  }
+
+  .fin-note {
+    font-size: 12px;
+    color: var(--color-muted);
+    font-style: italic;
+  }
+
+  .rules-list {
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    font-size: 13px;
+    color: var(--color-text);
+  }
+
+  .rules-list li::before {
+    content: '• ';
+    color: var(--color-primary-hover);
+    font-weight: bold;
+  }
+
+  .outcome-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+  }
+
+  .outcome-card {
+    background: #FFFFFF;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    padding: 12px 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .success-outcome {
+    border-color: rgba(34, 197, 94, 0.3);
+  }
+
+  .forfeit-outcome {
+    border-color: rgba(239, 106, 106, 0.3);
+  }
+
+  .outcome-icon {
+    font-weight: 800;
+    font-size: 13px;
+  }
+
+  .success-outcome .outcome-icon {
+    color: var(--color-primary-hover);
+  }
+
+  .forfeit-outcome .outcome-icon {
+    color: var(--color-missed);
+  }
+
+  .outcome-title {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--color-text);
+  }
+
+  .outcome-desc {
+    font-size: 12px;
+    color: var(--color-text-secondary);
+    line-height: 1.4;
+  }
+
+  /* Actions Area */
+  .checkout-actions-area {
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+    padding-top: 8px;
+  }
+
+  .terms-checkbox-label {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    cursor: pointer;
+    font-size: 13px;
+    color: var(--color-text);
+    line-height: 1.4;
+  }
+
+  .terms-checkbox-label input[type='checkbox'] {
+    margin-top: 3px;
+    accent-color: var(--color-primary);
+    width: 16px;
+    height: 16px;
+    cursor: pointer;
+  }
+
+  .action-buttons {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 12px;
+  }
+
+  .btn-stake-pay {
+    background: var(--color-primary);
+    color: #FFFFFF;
+    font-size: 14px;
+    font-weight: 600;
+    padding: 10px 20px;
+  }
+
+  .btn-stake-pay:hover:not(:disabled) {
+    background: var(--color-primary-hover);
+  }
+
+  .btn-stake-pay:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  .security-guarantee {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    font-size: 12px;
+    color: var(--color-muted);
+  }
+
+  .alert-box {
+    padding: 10px 14px;
+    border-radius: var(--radius-sm);
+    font-size: 13px;
+  }
+
+  .alert-error {
+    background: #FEE2E2;
+    border: 1px solid #FCA5A5;
+    color: #B91C1C;
+  }
+
+  @media (max-width: 640px) {
+    .checkout-card {
+      padding: 24px 16px;
+    }
+    .challenge-summary-row,
+    .financial-grid,
+    .outcome-grid {
+      grid-template-columns: 1fr;
+    }
+    .action-buttons {
+      flex-direction: column-reverse;
+      width: 100%;
+    }
+    .action-buttons .btn {
+      width: 100%;
+    }
+  }
+</style>
+
+<script>
+  const checkbox = document.getElementById('rules-acknowledgement') as HTMLInputElement;
+  const payBtn = document.getElementById('btn-confirm-stake') as HTMLButtonElement;
+  const form = document.getElementById('checkout-confirm-form') as HTMLFormElement;
+  const alertBox = document.getElementById('checkout-alert');
+
+  if (checkbox && payBtn) {
+    checkbox.addEventListener('change', () => {
+      payBtn.disabled = !checkbox.checked;
+    });
+  }
+
+  if (form && payBtn) {
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      if (!checkbox.checked) return;
+
+      payBtn.disabled = true;
+      payBtn.textContent = 'Verifying & Activating...';
+
+      const challengeId = form.dataset.challengeId;
+      const providerPaymentId = form.dataset.providerPaymentId;
+
+      try {
+        const res = await fetch('/api/payments/confirm', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ challengeId, providerPaymentId })
+        });
+
+        const data = await res.json();
+        if (res.ok && data.success) {
+          window.location.href = `/app/challenges/${challengeId}?staked=true`;
+        } else {
+          if (alertBox) {
+            alertBox.textContent = data.error || 'Payment verification failed.';
+            alertBox.className = 'alert-box alert-error';
+            alertBox.style.display = 'block';
+          }
+          payBtn.disabled = false;
+          payBtn.textContent = 'Try Again';
+        }
+      } catch (err) {
+        if (alertBox) {
+          alertBox.textContent = 'Connection error. Please try again.';
+          alertBox.className = 'alert-box alert-error';
+          alertBox.style.display = 'block';
+        }
+        payBtn.disabled = false;
+        payBtn.textContent = 'Try Again';
+      }
+    });
+  }
+</script>
