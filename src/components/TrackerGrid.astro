@@ -318,22 +318,47 @@ const activeActivities = activities.filter((a) => a.is_active);
 
   :global(.grid-cell.cell-past.status-pending) {
     background: #F4F4F0 !important;
-    opacity: 0.7;
+    border: 1px solid var(--color-border) !important;
+    color: var(--color-muted) !important;
+    opacity: 0.75 !important;
+    cursor: not-allowed !important;
   }
 
+  /* Future Cells: clearly visible with solid border and soft grey background */
   :global(.grid-cell.cell-future) {
-    opacity: 0.38 !important;
-    border-style: dashed !important;
-    background: transparent !important;
+    background: #F3F4F6 !important;
+    border: 1px solid #D1D5DB !important;
+    color: #9CA3AF !important;
+    opacity: 0.85 !important;
+    cursor: not-allowed !important;
   }
 
   :global(.grid-cell.cell-future:hover) {
-    background: transparent !important;
-    border-color: var(--color-border) !important;
+    background: #E5E7EB !important;
+    border-color: #9CA3AF !important;
+    transform: none !important;
+    box-shadow: none !important;
   }
 
   :global(.grid-cell.cell-future .cell-symbol) {
-    opacity: 0.3;
+    opacity: 0.65 !important;
+    color: #9CA3AF !important;
+  }
+
+  /* Editable cell (Today) styling for crisp responsiveness */
+  :global(.grid-cell.cell-editable) {
+    cursor: pointer !important;
+  }
+
+  :global(.grid-cell.cell-editable:hover) {
+    transform: scale(1.05);
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+  }
+
+  /* Prevent inner symbol from intercepting pointer clicks */
+  :global(.grid-cell .cell-symbol) {
+    pointer-events: none;
+    user-select: none;
   }
 
   /* Shake animation for locked cell attempts */
@@ -1193,11 +1218,11 @@ const activeActivities = activities.filter((a) => a.is_active);
         const textEl = rowNoteBtn.querySelector('.date-note-text');
         const iconEl = rowNoteBtn.querySelector('.date-note-icon');
         if (hasNote) {
-          if (textEl) textEl.textContent = `Note • ${actName}`;
+          if (textEl) textEl.textContent = 'Note';
           if (iconEl) iconEl.textContent = '📝';
           rowNoteBtn.title = `View note for ${actName} (${date})`;
         } else {
-          if (textEl) textEl.textContent = `+ Note • ${actName}`;
+          if (textEl) textEl.textContent = 'Add Note';
           if (iconEl) iconEl.textContent = '+';
           rowNoteBtn.title = `Add note for ${actName} (${date})`;
         }
@@ -1394,11 +1419,11 @@ const activeActivities = activities.filter((a) => a.is_active);
       const c = cell as HTMLElement;
 
       // Single click: select cell & toggle Completed <-> Pending IF editable
-      c.addEventListener('click', (e) => {
-        // Prevent toggle if popover is open
-        if (popover.style.display !== 'none') return;
-        // If double clicking in rapid succession, don't flip back and forth
-        if (e.detail > 1) return;
+      c.addEventListener('click', () => {
+        // If right-click popover is open, close it cleanly
+        if (popover && popover.style.display !== 'none') {
+          closePopover();
+        }
 
         selectCell(c);
 
@@ -1506,11 +1531,7 @@ const activeActivities = activities.filter((a) => a.is_active);
     // Close right-click popover when clicking outside
     document.addEventListener('click', (e) => {
       const target = e.target as HTMLElement;
-      if (
-        popover.style.display !== 'none' &&
-        !popover.contains(target) &&
-        !target.classList.contains('grid-cell')
-      ) {
+      if (popover && popover.style.display !== 'none' && !popover.contains(target)) {
         closePopover();
       }
     });
