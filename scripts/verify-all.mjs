@@ -18,10 +18,18 @@ const users = db.prepare('SELECT id, name, email, created_at, password_hash FROM
 console.log(`[PASS] 2. Users Table: Found ${users.length} registered user(s).`);
 users.forEach(u => {
   console.log(`       - User: "${u.name}" (${u.email}) [ID: ${u.id}]`);
-  const [salt, key] = u.password_hash.split(':');
-  const derived = crypto.scryptSync('password123', salt, 64);
-  const ok = crypto.timingSafeEqual(Buffer.from(key, 'hex'), derived);
-  console.log(`       - Scrypt Password Authentication Verification: ${ok ? 'PASSED' : 'FAILED'}`);
+  if (u.password_hash && u.password_hash.includes(':')) {
+    const [salt, key] = u.password_hash.split(':');
+    if (salt && key) {
+      try {
+        const derived = crypto.scryptSync('password123', salt, 64);
+        const ok = crypto.timingSafeEqual(Buffer.from(key, 'hex'), derived);
+        console.log(`       - Scrypt Password Authentication Verification: ${ok ? 'PASSED' : 'FAILED'}`);
+      } catch {
+        console.log(`       - Scrypt Password Authentication Verification: FAILED`);
+      }
+    }
+  }
 });
 
 // 3. Challenge Records

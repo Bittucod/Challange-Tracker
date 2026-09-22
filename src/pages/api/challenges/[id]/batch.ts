@@ -1,7 +1,7 @@
 import type { APIRoute } from 'astro';
 import { db } from '../../../../lib/db';
 import { getUserFromCookies, generateId } from '../../../../lib/auth';
-import { calculateChallengeAnalytics, checkMilestones } from '../../../../lib/engine';
+import { calculateChallengeAnalytics, checkMilestones, getLocalTodayDateString } from '../../../../lib/engine';
 import type { Challenge, Activity, DailyRecord, Milestone } from '../../../../lib/types';
 
 export const POST: APIRoute = async ({ params, request, cookies }) => {
@@ -36,29 +36,35 @@ export const POST: APIRoute = async ({ params, request, cookies }) => {
       });
     }
 
+    const todayStr = getLocalTodayDateString();
     const now = new Date().toISOString();
 
     const upsertRecord = db.transaction((recs: any[]) => {
       for (const item of recs) {
         if (!item.activity_id || !item.date) continue;
 
-        const validStatus = ['pending', 'completed', 'missed', 'na'].includes(item.status)
-          ? item.status
-          : 'completed';
         const note = typeof item.note === 'string' ? item.note.trim() : '';
 
         const existing = db
           .prepare(
-            'SELECT id FROM daily_records WHERE challenge_id = ? AND activity_id = ? AND date = ?'
+            'SELECT id, status FROM daily_records WHERE challenge_id = ? AND activity_id = ? AND date = ?'
           )
-          .get(id, item.activity_id, item.date) as { id: string } | undefined;
+          .get(id, item.activity_id, item.date) as { id: string; status: string } | undefined;
+
+        // If date is not today, status cannot be changed
+        let statusToSave = existing ? existing.status : 'pending';
+        if (item.date === todayStr) {
+          statusToSave = ['pending', 'completed', 'missed', 'na'].includes(item.status)
+            ? item.status
+            : (existing ? existing.status : 'completed');
+        }
 
         if (existing) {
           db.prepare(`
             UPDATE daily_records
             SET status = ?, note = ?, updated_at = ?
             WHERE id = ?
-          `).run(validStatus, note, now, existing.id);
+          `).run(statusToSave, note, now, existing.id);
         } else {
           db.prepare(`
             INSERT INTO daily_records (
@@ -69,7 +75,7 @@ export const POST: APIRoute = async ({ params, request, cookies }) => {
             id,
             item.activity_id,
             item.date,
-            validStatus,
+            statusToSave,
             note,
             now,
             now

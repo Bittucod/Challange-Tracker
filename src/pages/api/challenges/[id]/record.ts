@@ -3,7 +3,8 @@ import { db } from '../../../../lib/db';
 import { getUserFromCookies, generateId } from '../../../../lib/auth';
 import {
   calculateChallengeAnalytics,
-  checkMilestones
+  checkMilestones,
+  getLocalTodayDateString
 } from '../../../../lib/engine';
 import type { Challenge, Activity, DailyRecord, Milestone } from '../../../../lib/types';
 
@@ -39,11 +40,7 @@ export const POST: APIRoute = async ({ params, request, cookies }) => {
       );
     }
 
-    const validStatus = ['pending', 'completed', 'missed', 'na'].includes(status)
-      ? status
-      : 'completed';
-
-    const now = new Date().toISOString();
+    const todayStr = getLocalTodayDateString();
 
     // Check if record exists
     const existing = db
@@ -52,17 +49,40 @@ export const POST: APIRoute = async ({ params, request, cookies }) => {
       )
       .get(id, activity_id, date) as DailyRecord | undefined;
 
+    const validStatus = ['pending', 'completed', 'missed', 'na'].includes(status)
+      ? status
+      : (existing ? existing.status : 'completed');
+
+    // Strict Date Locking: only today's status can be updated
+    if (date !== todayStr) {
+      const isStatusChange = !existing || existing.status !== validStatus;
+      if (isStatusChange && status !== undefined) {
+        return new Response(
+          JSON.stringify({
+            error: date < todayStr
+              ? 'Past days are locked to preserve streak integrity.'
+              : 'Future days cannot be marked in advance.'
+          }),
+          { status: 403, headers: { 'Content-Type': 'application/json' } }
+        );
+      }
+    }
+
+    const now = new Date().toISOString();
+
     let updatedNote = existing ? existing.note || '' : '';
     if (typeof note === 'string') {
       updatedNote = note.trim();
     }
+
+    const finalStatus = date === todayStr ? validStatus : (existing ? existing.status : 'pending');
 
     if (existing) {
       db.prepare(`
         UPDATE daily_records
         SET status = ?, note = ?, updated_at = ?
         WHERE id = ?
-      `).run(validStatus, updatedNote, now, existing.id);
+      `).run(finalStatus, updatedNote, now, existing.id);
     } else {
       db.prepare(`
         INSERT INTO daily_records (
@@ -73,7 +93,7 @@ export const POST: APIRoute = async ({ params, request, cookies }) => {
         id,
         activity_id,
         date,
-        validStatus,
+        finalStatus,
         updatedNote,
         now,
         now

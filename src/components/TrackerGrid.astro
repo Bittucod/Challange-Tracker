@@ -26,16 +26,6 @@ const activeActivities = activities.filter((a) => a.is_active);
         <button class="filter-pill" data-filter="current">Active / Recent</button>
         <button class="filter-pill" data-filter="incomplete">Pending Only</button>
       </div>
-
-      <!-- Contextual Action for Selected Cell -->
-      <div id="selected-cell-control" class="selected-cell-control" style="display: none;">
-        <span id="selected-cell-title" class="selected-cell-title">Day 1</span>
-        <button type="button" id="btn-cell-note-action" class="btn-cell-note-action" title="Add note" aria-label="Add note">
-          <span id="cell-note-action-icon" class="cell-note-action-icon">•</span>
-          <span id="cell-note-action-text">Add Note</span>
-        </button>
-        <button type="button" id="btn-deselect-cell" class="btn-deselect-cell" title="Deselect cell" aria-label="Deselect cell">✕</button>
-      </div>
     </div>
 
     <div class="toolbar-right">
@@ -74,14 +64,43 @@ const activeActivities = activities.filter((a) => a.is_active);
             day.isFuture ? 'tracker-row-future' : ''
           ].filter(Boolean).join(' ');
 
+          const rowNotes = Object.values(day.records).filter((r) => r && r.note && r.note.trim());
+          const hasRowNotes = rowNotes.length > 0;
+
           return (
-            <tr class={rowClass} id={day.isToday ? 'today-row' : `row-${day.date}`} data-date={day.date} data-day-num={day.dayNumber}>
+            <tr
+              class={rowClass}
+              id={day.isToday ? 'today-row' : `row-${day.date}`}
+              data-date={day.date}
+              data-day-num={day.dayNumber}
+              data-is-today={day.isToday ? 'true' : 'false'}
+              data-is-past={day.isPast ? 'true' : 'false'}
+              data-is-future={day.isFuture ? 'true' : 'false'}
+            >
               <td class="col-date">
                 <div class="date-cell-inner">
-                  <span class="day-num">D{day.dayNumber}</span>
-                  <span class="date-short">{day.shortDate}</span>
-                  <span class="day-dow">{day.dayOfWeek}</span>
-                  {day.isToday && <span class="today-tag">TODAY</span>}
+                  <div class="date-row-main">
+                    <span class="day-num">D{day.dayNumber}</span>
+                    <span class="date-short">{day.shortDate}</span>
+                    <span class="day-dow">{day.dayOfWeek}</span>
+                    {day.isToday && <span class="today-tag">TODAY</span>}
+                    {day.isPast && <span class="lock-tag" title="Locked: Past day (Preserves streak)">🔒</span>}
+                    {day.isFuture && <span class="lock-tag" title="Locked: Future day (Unlocks on date)">⏳</span>}
+                  </div>
+                  <div class="date-note-action" id={`date-note-action-${day.date}`}>
+                    <button
+                      type="button"
+                      class={`btn-date-note ${hasRowNotes ? 'has-note' : ''}`}
+                      data-date={day.date}
+                      data-day-num={day.dayNumber}
+                      data-short-date={day.shortDate}
+                      title={hasRowNotes ? `View notes for Day ${day.dayNumber}` : `Add note for Day ${day.dayNumber}`}
+                      aria-label={`Note for Day ${day.dayNumber}`}
+                    >
+                      <span class="date-note-icon">{hasRowNotes ? '📝' : '+'}</span>
+                      <span class="date-note-text">{hasRowNotes ? 'Note' : 'Add Note'}</span>
+                    </button>
+                  </div>
                 </div>
               </td>
 
@@ -90,11 +109,12 @@ const activeActivities = activities.filter((a) => a.is_active);
                 const status = rec ? rec.status : 'pending';
                 const hasNote = Boolean(rec && rec.note && rec.note.trim());
                 const noteContent = rec ? rec.note || '' : '';
+                const isLocked = !day.isToday;
 
                 return (
                   <td class="cell-wrapper" data-activity-id={act.id}>
                     <div
-                      class={`grid-cell status-${status} ${hasNote ? 'has-note' : ''}`}
+                      class={`grid-cell status-${status} ${hasNote ? 'has-note' : ''} ${isLocked ? 'cell-locked' : 'cell-editable'} ${day.isPast ? 'cell-past' : ''} ${day.isFuture ? 'cell-future' : ''}`}
                       data-date={day.date}
                       data-day-num={day.dayNumber}
                       data-short-date={day.shortDate}
@@ -102,10 +122,18 @@ const activeActivities = activities.filter((a) => a.is_active);
                       data-activity-name={act.name}
                       data-status={status}
                       data-note={noteContent}
-                      title={`${act.name} on ${day.shortDate}: ${status.toUpperCase()}${hasNote ? ' (Has Note)' : ''}`}
-                      tabindex="0"
+                      data-locked={isLocked ? 'true' : 'false'}
+                      data-is-past={day.isPast ? 'true' : 'false'}
+                      data-is-future={day.isFuture ? 'true' : 'false'}
+                      title={
+                        isLocked
+                          ? `${act.name} on ${day.shortDate}: ${status.toUpperCase()} (${day.isPast ? 'Locked: Past day' : 'Locked: Future day'})`
+                          : `${act.name} on ${day.shortDate}: ${status.toUpperCase()} (Click to toggle)`
+                      }
+                      tabindex={isLocked ? '-1' : '0'}
                       role="button"
-                      aria-label={`${act.name} on ${day.shortDate}${hasNote ? ' - This day has a note' : ''}`}
+                      aria-disabled={isLocked ? 'true' : 'false'}
+                      aria-label={`${act.name} on ${day.shortDate}${isLocked ? ' (Locked)' : ''}${hasNote ? ' - This day has a note' : ''}`}
                     >
                       <span class="cell-symbol">
                         {status === 'completed' && '✓'}
@@ -128,6 +156,12 @@ const activeActivities = activities.filter((a) => a.is_active);
         })}
       </tbody>
     </table>
+  </div>
+
+  <!-- Floating Lock Toast Notification -->
+  <div id="grid-lock-toast" class="grid-lock-toast" style="display: none;">
+    <span id="grid-lock-toast-icon" class="lock-toast-icon">🔒</span>
+    <span id="grid-lock-toast-msg" class="lock-toast-msg">Past days are locked to maintain streak integrity.</span>
   </div>
 
   <!-- Minimal Lightweight Daily Note Modal / Popover -->
@@ -265,76 +299,78 @@ const activeActivities = activities.filter((a) => a.is_active);
     font-weight: 600;
   }
 
-  /* Contextual Selected Cell Control */
-  .selected-cell-control {
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
-    background: var(--color-surface);
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius-sm);
-    padding: 3px 8px;
-    font-size: 12px;
-    animation: cellPillFade 0.15s ease;
-  }
-
-  @keyframes cellPillFade {
-    from { opacity: 0; transform: translateY(-2px); }
-    to { opacity: 1; transform: translateY(0); }
-  }
-
-  .selected-cell-title {
-    font-weight: 600;
-    color: var(--color-text);
-  }
-
-  .btn-cell-note-action {
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
-    font-size: 12px;
-    font-weight: 600;
-    color: var(--color-primary);
-    background: var(--color-primary-light);
-    border: 1px solid transparent;
-    padding: 2px 8px;
-    border-radius: 4px;
-    cursor: pointer;
-    transition: all 0.12s ease;
-  }
-
-  .btn-cell-note-action:hover {
-    background: #DCFCE7;
-    color: var(--color-primary-hover);
-  }
-
-  .cell-note-action-icon {
-    font-size: 10px;
-    line-height: 1;
-  }
-
-  .btn-deselect-cell {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    background: transparent;
-    border: none;
-    color: var(--color-muted);
-    font-size: 11px;
-    padding: 2px 4px;
-    cursor: pointer;
-    border-radius: 3px;
-  }
-
-  .btn-deselect-cell:hover {
-    color: var(--color-text);
-    background: var(--color-surface-hover);
-  }
-
   /* Cell Selected Outline (Zero Layout Shift) */
   :global(.grid-cell.cell-selected) {
     outline: 2px solid var(--color-primary) !important;
     outline-offset: 1px !important;
+  }
+
+  /* Locked Cell Styles */
+  :global(.grid-cell.cell-locked) {
+    cursor: not-allowed !important;
+  }
+
+  :global(.grid-cell.cell-locked:hover) {
+    transform: none !important;
+    filter: none !important;
+    box-shadow: none !important;
+  }
+
+  :global(.grid-cell.cell-past.status-pending) {
+    background: #F4F4F0 !important;
+    opacity: 0.7;
+  }
+
+  :global(.grid-cell.cell-future) {
+    opacity: 0.38 !important;
+    border-style: dashed !important;
+    background: transparent !important;
+  }
+
+  :global(.grid-cell.cell-future:hover) {
+    background: transparent !important;
+    border-color: var(--color-border) !important;
+  }
+
+  :global(.grid-cell.cell-future .cell-symbol) {
+    opacity: 0.3;
+  }
+
+  /* Shake animation for locked cell attempts */
+  @keyframes cellShake {
+    0%, 100% { transform: translateX(0); }
+    25% { transform: translateX(-3px); }
+    75% { transform: translateX(3px); }
+  }
+
+  :global(.grid-cell.cell-shake) {
+    animation: cellShake 0.25s ease !important;
+  }
+
+  /* Floating Lock Toast Notification */
+  .grid-lock-toast {
+    position: fixed;
+    bottom: 28px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: #1E293B;
+    color: #F8FAFC;
+    padding: 10px 18px;
+    border-radius: 9999px;
+    font-size: 13px;
+    font-weight: 500;
+    box-shadow: 0 10px 25px -3px rgba(0, 0, 0, 0.3), 0 4px 6px -2px rgba(0, 0, 0, 0.1);
+    z-index: 2100;
+    pointer-events: none;
+    animation: toastFadeIn 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  @keyframes toastFadeIn {
+    from { opacity: 0; transform: translate(-50%, 12px); }
+    to { opacity: 1; transform: translate(-50%, 0); }
   }
 
   .sync-indicator {
@@ -385,13 +421,27 @@ const activeActivities = activities.filter((a) => a.is_active);
     display: inline-flex;
   }
 
-  /* Date column formatting */
+  /* Date column formatting & in-row actions */
+  .col-date {
+    min-width: 200px;
+    padding-left: 12px !important;
+    padding-right: 12px !important;
+  }
+
   .date-cell-inner {
     display: flex;
     align-items: center;
-    gap: 6px;
+    justify-content: space-between;
+    gap: 8px;
     font-size: 12px;
     font-variant-numeric: tabular-nums;
+  }
+
+  .date-row-main {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    white-space: nowrap;
   }
 
   .day-num {
@@ -417,6 +467,65 @@ const activeActivities = activities.filter((a) => a.is_active);
     background: var(--color-primary);
     color: #FFFFFF;
     letter-spacing: 0.04em;
+  }
+
+  .lock-tag {
+    font-size: 11px;
+    opacity: 0.7;
+    cursor: help;
+  }
+
+  .date-note-action {
+    display: inline-flex;
+    align-items: center;
+  }
+
+  .btn-date-note {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--color-text-secondary);
+    background: var(--color-surface-subtle);
+    border: 1px solid var(--color-border);
+    padding: 2px 8px;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    white-space: nowrap;
+    opacity: 0.35;
+  }
+
+  .tracker-row:hover .btn-date-note,
+  .tracker-row-today .btn-date-note,
+  .btn-date-note.has-note,
+  .btn-date-note.date-note-active {
+    opacity: 1;
+  }
+
+  .btn-date-note:hover {
+    color: var(--color-primary-hover);
+    border-color: var(--color-primary-light);
+    background: var(--color-primary-light);
+    opacity: 1;
+  }
+
+  .btn-date-note.has-note {
+    color: #047857;
+    background: #ECFDF5;
+    border-color: #A7F3D0;
+    font-weight: 600;
+    opacity: 1;
+  }
+
+  .btn-date-note.date-note-active {
+    color: var(--color-primary);
+    border-color: var(--color-primary);
+    background: var(--color-primary-light);
+    font-weight: 600;
+    opacity: 1;
+    box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.25);
   }
 
   /* Status Summary */
@@ -764,12 +873,20 @@ const activeActivities = activities.filter((a) => a.is_active);
     const syncStatus = document.getElementById('sync-status');
     const syncText = syncStatus?.querySelector('.sync-text');
 
-    // Contextual Toolbar Selected Cell Controls
-    const selectedCellControl = document.getElementById('selected-cell-control');
-    const selectedCellTitle = document.getElementById('selected-cell-title');
-    const cellNoteActionBtn = document.getElementById('btn-cell-note-action');
-    const cellNoteActionText = document.getElementById('cell-note-action-text');
-    const btnDeselectCell = document.getElementById('btn-deselect-cell');
+    // Lock Toast Notification Elements
+    const lockToast = document.getElementById('grid-lock-toast');
+    const lockToastMsg = document.getElementById('grid-lock-toast-msg');
+    let lockToastTimer: any = null;
+
+    function showLockToast(message: string) {
+      if (!lockToast || !lockToastMsg) return;
+      lockToastMsg.textContent = message;
+      lockToast.style.display = 'flex';
+      clearTimeout(lockToastTimer);
+      lockToastTimer = setTimeout(() => {
+        if (lockToast) lockToast.style.display = 'none';
+      }, 2400);
+    }
 
     // Note Modal Elements
     const noteModalOverlay = document.getElementById('note-modal-overlay') as HTMLElement;
@@ -888,6 +1005,7 @@ const activeActivities = activities.filter((a) => a.is_active);
       }
 
       updateRowSummary(cell.closest('tr'));
+      refreshRowNotesState(cell.closest('tr'));
     }
 
     // Recalculate row status client-side optimistically
@@ -995,6 +1113,54 @@ const activeActivities = activities.filter((a) => a.is_active);
       }
     }
 
+    // In-row Date Column Note Button Click Handlers
+    document.querySelectorAll('.btn-date-note').forEach((btn) => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const date = (btn as HTMLElement).dataset.date;
+        const row = btn.closest('tr');
+        if (!row) return;
+
+        // If a cell on this row is already selected, open note for that cell
+        if (selectedCell && selectedCell.dataset.date === date) {
+          openNoteForCell(selectedCell);
+          return;
+        }
+
+        // Otherwise pick the cell with a note, or the first cell of this row
+        const cellWithNote = row.querySelector('.grid-cell.has-note') as HTMLElement | null;
+        const targetCell = cellWithNote || (row.querySelector('.grid-cell') as HTMLElement | null);
+        if (targetCell) {
+          selectCell(targetCell);
+          openNoteForCell(targetCell);
+        }
+      });
+    });
+
+    // Helper: update row note button styling when notes change
+    function refreshRowNotesState(row: HTMLTableRowElement | null) {
+      if (!row) return;
+      const noteBtn = row.querySelector('.btn-date-note') as HTMLElement | null;
+      if (!noteBtn) return;
+      const cellsWithNotes = row.querySelectorAll('.grid-cell.has-note');
+      const textEl = noteBtn.querySelector('.date-note-text');
+      const iconEl = noteBtn.querySelector('.date-note-icon');
+
+      if (cellsWithNotes.length > 0) {
+        noteBtn.classList.add('has-note');
+        if (!noteBtn.classList.contains('date-note-active')) {
+          if (textEl) textEl.textContent = 'Note';
+          if (iconEl) iconEl.textContent = '📝';
+        }
+      } else {
+        noteBtn.classList.remove('has-note');
+        if (!noteBtn.classList.contains('date-note-active')) {
+          if (textEl) textEl.textContent = 'Add Note';
+          if (iconEl) iconEl.textContent = '+';
+        }
+      }
+    }
+
     // Cell Selection Handling
     function selectCell(cell: HTMLElement) {
       if (selectedCell && selectedCell !== cell) {
@@ -1003,23 +1169,38 @@ const activeActivities = activities.filter((a) => a.is_active);
       selectedCell = cell;
       selectedCell.classList.add('cell-selected');
 
-      const dayNum = cell.dataset.dayNum || '';
+      const date = cell.dataset.date || '';
+      const actName = cell.dataset.activityName || '';
       const note = (cell.dataset.note || '').trim();
       const hasNote = Boolean(note);
 
-      if (selectedCellControl) {
-        selectedCellControl.style.display = 'inline-flex';
-      }
-      if (selectedCellTitle) {
-        selectedCellTitle.textContent = `Day ${dayNum}`;
-      }
-      if (cellNoteActionText) {
-        cellNoteActionText.textContent = hasNote ? 'Show Note' : 'Add Note';
-      }
-      if (cellNoteActionBtn) {
-        const label = hasNote ? `Show note for Day ${dayNum}` : `Add note for Day ${dayNum}`;
-        cellNoteActionBtn.title = label;
-        cellNoteActionBtn.setAttribute('aria-label', label);
+      // Reset all row note buttons to inactive outline
+      document.querySelectorAll('.btn-date-note').forEach((b) => {
+        b.classList.remove('date-note-active');
+        const r = b.closest('tr');
+        const hasNotes = Boolean(r?.querySelector('.grid-cell.has-note'));
+        const textEl = b.querySelector('.date-note-text');
+        const iconEl = b.querySelector('.date-note-icon');
+        if (textEl) textEl.textContent = hasNotes ? 'Note' : 'Add Note';
+        if (iconEl) iconEl.textContent = hasNotes ? '📝' : '+';
+      });
+
+      // Highlight the note button in the clicked cell's row
+      const row = cell.closest('tr');
+      const rowNoteBtn = row?.querySelector('.btn-date-note') as HTMLElement | null;
+      if (rowNoteBtn) {
+        rowNoteBtn.classList.add('date-note-active');
+        const textEl = rowNoteBtn.querySelector('.date-note-text');
+        const iconEl = rowNoteBtn.querySelector('.date-note-icon');
+        if (hasNote) {
+          if (textEl) textEl.textContent = `Note • ${actName}`;
+          if (iconEl) iconEl.textContent = '📝';
+          rowNoteBtn.title = `View note for ${actName} (${date})`;
+        } else {
+          if (textEl) textEl.textContent = `+ Note • ${actName}`;
+          if (iconEl) iconEl.textContent = '+';
+          rowNoteBtn.title = `Add note for ${actName} (${date})`;
+        }
       }
     }
 
@@ -1028,13 +1209,15 @@ const activeActivities = activities.filter((a) => a.is_active);
         selectedCell.classList.remove('cell-selected');
         selectedCell = null;
       }
-      if (selectedCellControl) {
-        selectedCellControl.style.display = 'none';
-      }
-    }
-
-    if (btnDeselectCell) {
-      btnDeselectCell.addEventListener('click', deselectCell);
+      document.querySelectorAll('.btn-date-note').forEach((b) => {
+        b.classList.remove('date-note-active');
+        const row = b.closest('tr');
+        const hasNotes = Boolean(row?.querySelector('.grid-cell.has-note'));
+        const textEl = b.querySelector('.date-note-text');
+        const iconEl = b.querySelector('.date-note-icon');
+        if (textEl) textEl.textContent = hasNotes ? 'Note' : 'Add Note';
+        if (iconEl) iconEl.textContent = hasNotes ? '📝' : '+';
+      });
     }
 
     // Open Note Viewer / Editor for a cell
@@ -1136,15 +1319,6 @@ const activeActivities = activities.filter((a) => a.is_active);
       }
     });
 
-    // Toolbar Action Button Click
-    if (cellNoteActionBtn) {
-      cellNoteActionBtn.addEventListener('click', () => {
-        if (selectedCell) {
-          openNoteForCell(selectedCell);
-        }
-      });
-    }
-
     // Note View: Switch to Edit
     if (btnEditNote) {
       btnEditNote.addEventListener('click', () => {
@@ -1178,6 +1352,7 @@ const activeActivities = activities.filter((a) => a.is_active);
       setCellVisual(cell, status, '');
       await persistCell(actId, date, status, '');
       selectCell(cell);
+      refreshRowNotesState(cell.closest('tr'));
       closeNoteModal();
     }
 
@@ -1209,6 +1384,7 @@ const activeActivities = activities.filter((a) => a.is_active);
         setCellVisual(activeCellForNote, status, newNote);
         await persistCell(actId, date, status, newNote);
         selectCell(activeCellForNote);
+        refreshRowNotesState(activeCellForNote.closest('tr'));
         closeNoteModal();
       });
     }
@@ -1217,12 +1393,30 @@ const activeActivities = activities.filter((a) => a.is_active);
     document.querySelectorAll('.grid-cell').forEach((cell) => {
       const c = cell as HTMLElement;
 
-      // Single click: toggle Completed <-> Pending & select cell
+      // Single click: select cell & toggle Completed <-> Pending IF editable
       c.addEventListener('click', (e) => {
         // Prevent toggle if popover is open
         if (popover.style.display !== 'none') return;
         // If double clicking in rapid succession, don't flip back and forth
         if (e.detail > 1) return;
+
+        selectCell(c);
+
+        const isLocked = c.dataset.locked === 'true';
+        if (isLocked) {
+          c.classList.remove('cell-shake');
+          void c.offsetWidth;
+          c.classList.add('cell-shake');
+          setTimeout(() => c.classList.remove('cell-shake'), 300);
+
+          const isPast = c.dataset.isPast === 'true';
+          showLockToast(
+            isPast
+              ? '🔒 Past days are locked to maintain streak integrity.'
+              : '⏳ Future days cannot be marked in advance.'
+          );
+          return;
+        }
 
         const currentStatus = c.dataset.status || 'pending';
         const newStatus = currentStatus === 'completed' ? 'pending' : 'completed';
@@ -1232,7 +1426,6 @@ const activeActivities = activities.filter((a) => a.is_active);
 
         setCellVisual(c, newStatus);
         persistCell(actId, date, newStatus, note);
-        selectCell(c);
       });
 
       // Desktop Double click: opens note editor/viewer
@@ -1246,6 +1439,17 @@ const activeActivities = activities.filter((a) => a.is_active);
       c.addEventListener('contextmenu', (e) => {
         e.preventDefault();
         selectCell(c);
+
+        const isLocked = c.dataset.locked === 'true';
+        if (isLocked) {
+          showLockToast(
+            c.dataset.isPast === 'true'
+              ? '🔒 Past days are locked and cannot be modified.'
+              : '⏳ Future days unlock when the date arrives.'
+          );
+          return;
+        }
+
         openPopover(c);
       });
     });
